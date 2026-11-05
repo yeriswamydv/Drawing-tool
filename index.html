@@ -18,17 +18,14 @@ button.o{background:none;color:var(--ac);border:1px solid var(--ac)}
 #err{color:#c0392b;min-height:1.2em;margin-top:6px}#prev{overflow-x:auto}#prev svg{width:100%;min-width:640px;height:auto;display:block;border:1px solid var(--bd)}
 </style></head><body>
 <h1>Drawing Sheet Generator</h1>
-<p class="s">Paste design data in any format, let Claude read it into drawing parameters, preview the A3 sheet, then download the PDF. Output is preliminary and must be checked by an engineer before use. Example data below is dummy.</p>
-<div class="c" style="margin-bottom:12px"><b>Anthropic API key</b> <span class="s">(only needed for “Read data with Claude”)</span><br>
-<input id="key" type="password" autocomplete="off" placeholder="sk-ant-..." style="width:min(420px,100%);box-sizing:border-box;margin:6px 6px 0 0;padding:7px;background:var(--bg);color:var(--fg);border:1px solid var(--bd);border-radius:6px">
-<label style="display:inline;font-weight:400"><input type="checkbox" id="rem"> remember on this device</label> <button id="forget" class="o">Clear key</button>
-<div class="s" style="margin:6px 0 0">The key stays in this browser and is sent only to api.anthropic.com. Never put it in the repository or the HTML file.</div></div>
+<p class="s">Paste design data in any format, use a Claude chat to turn it into drawing parameters (free, no API key), preview the A3 sheet, then download the PDF. Output is preliminary and must be checked by an engineer before use. Example data below is dummy.</p>
+<div class="c" style="margin-bottom:12px"><b>Free, no API key</b><div class="s" style="margin:4px 0 0">Paste design data in any wording and click <b>Read data</b>: the built-in reader picks out the part number, material, OD, bore, thickness, pockets and hole groups, and tells you what it found and what is missing. For messy text, use “Copy prompt for Claude”, send it in a Claude chat, and paste the reply into Parameters.</div></div></div>
 <div class="g">
 <div class="c">
 <label for="spec">Design data (free text)</label>
 <textarea id="spec" rows="8">Example Ring EX-RING-01. Material aluminium 6061-T6, density 2.70. Outer diameter 600 mm, thickness 24 mm, central bore 380 mm. 12 pockets 18 deep with 6 floor, ribs 14 wide, R6 corners. Hole group A: 24 x dia 8 through on 410 PCD. Group B: 24 x M6 tapped, drill dia 5 x 14 deep, on 584 PCD. Group C: 6 x dia 8 through with C-bore dia 14 x 7 deep, on bosses dia 36, 500 PCD, at 15, 105, 135, 225, 255, 345 deg.</textarea>
-<button id="read">Read data with Claude</button>
-<label for="json">Parameters (editable)</label>
+<button id="auto">Read data</button><button id="read" class="o">Copy prompt for Claude (harder text)</button><a href="https://claude.ai/new" target="_blank" rel="noopener" style="color:var(--ac);font-weight:600">Open Claude</a>
+<label for="json">Parameters (paste Claude’s reply here, or edit)</label>
 <textarea id="json" rows="18" spellcheck="false"></textarea>
 <button id="upd" class="o">Update preview</button><button id="dl">Download PDF</button>
 <div id="err"></div>
@@ -108,7 +105,7 @@ L(c[0],c[1],tx-o2[0]/l*3,ty-o2[1]/l*3,.2);PL(polar(3,0,360,24).map(([a,b])=>[tx+
 T(cx,202,'TOP VIEW',4.2,'m',0,0,1);T(cx,206.5,'SCALE '+sc(s),2.8);
 // ---- sections
 const tolT=P.tolT||'',kgf=v=>v/1e6*(+P.density||2.81);
-function section(nm,a,y0,idx){const x0=265,W=(od-bore)/2,r0=bore/2,xr=r=>x0+r-r0,da=pk?Math.abs(((a+pi/2)%pi+pi)%pi-pi/2):0,inP=!!pk&&da<hw((rin+rout)/2),
+function section(nm,a,y0,idx){const x0=265,W=Math.min((od-bore)/2,125),r0=od/2-W,part=(od-bore)/2>125,xr=r=>x0+r-r0,da=pk?Math.abs(((a+pi/2)%pi+pi)%pi-pi/2):0,inP=!!pk&&da<hw((rin+rout)/2),
 hs=H.filter(h=>(h.angles||Array.from({length:+h.qty||1},(_,i)=>(+h.start||0)+i*360/(+h.qty||1))).some(g=>Math.abs(((g-a+180)%360+360)%360-180)<.5));
 const tp=r=>{if(r<r0||r>od/2)return thk;let t=0;if(inP&&r>rin&&r<rout){t=+pk.depth;if(hs.some(h=>h.boss&&Math.abs(r-h.pcd/2)<h.boss/2))t=0}
 hs.forEach(h=>{const d=Math.abs(r-h.pcd/2);if(d<h.dia/2)t=Math.max(t,h.depth?+h.depth+(h.dia/2-d)*1.6:thk);if(h.cbore&&d<h.cbore.dia/2)t=Math.max(t,+h.cbore.depth)});return Math.min(t,thk)};
@@ -121,7 +118,7 @@ L(tx+(tx<xh?13:-1),ty+1.5,xh,y0,.2);arrow(xh,y0,tx<xh?-.5:.5,-.86);T(tx,ty,lb,2.
 if(!idx){if(inP){dim(xr(r0),y0,xr(rin),y0,-12,R2(rin-r0));dim(xr(rin),y0,xr(rout),y0,-12,R2(rout-rin)+tb('pockets'));dim(xr(rout),y0,x0+W,y0,-12,R2(od/2-rout));
 const d=+pk.depth;dim(xr(rout)-6,y0,xr(rout)-6,y0+d,.01,R2(d));dim(x0+W,y0+d,x0+W,y0+thk,-9,R2(pk.floor||thk-d))}
 dim(x0,y0,x0,y0+thk,10,R2(thk)+' '+tolT)}
-T(x0,y0+thk+11,'SECTION '+nm+'-'+nm,4.2,'l',0,0,1);T(x0+45,y0+thk+11,'SCALE 1:1   (THROUGH '+(inP?'POCKET':hs.some(h=>h.boss)?'STRUT BOSS':'RIB')+', '+a+'\u00b0)',2.6,'l')}
+T(x0,y0+thk+11,'SECTION '+nm+'-'+nm,4.2,'l',0,0,1);T(x0+45,y0+thk+11,'SCALE 1:1'+(part?' (OUTER 125 SHOWN)':'')+'   (THROUGH '+(inP?'POCKET':hs.some(h=>h.boss)?'STRUT BOSS':pk?'RIB':'SOLID WEB')+', '+a+'\u00b0)',2.6,'l')}
 cuts.forEach(([n,a],i)=>section(n,a,i?176:118,i));
 // ---- mass
 const dn=+P.density||2.81,kg=v=>v/1e6*dn,Vs=Math.PI*(od/2)**2*thk,Vb=Math.PI*(bore/2)**2*thk;
@@ -158,17 +155,39 @@ function pdf(S){const d=new window.jspdf.jsPDF({orientation:'landscape',unit:'mm
 S.forEach((o,si)=>{if(si)d.addPage('a3','landscape');o.forEach(e=>{if(e.t=='i')d.addImage(e.u,'PNG',e.p[0],e.p[1],e.p[2],e.p[3]);else if(e.t=='p'){d.setLineWidth(e.w);d.setLineDashPattern(e.s?[e.s,e.s/2]:[],0);d.setDrawColor(...hx(e.c||'#111111'));if(e.f)d.setFillColor(...hx(e.f));const p=e.p;d.lines(p.slice(1).map((q,i)=>[q[0]-p[i][0],q[1]-p[i][1]]),p[0][0],p[0][1],[1,1],e.f?'FD':'S',!!e.z)}
 else{d.setFont('helvetica',e.b?'bold':'normal');d.setTextColor(...hx(e.c||'#111111'));d.setFontSize(e.z*2.835);d.text(String(e.x),e.p[0],e.p[1],{align:{l:'left',m:'center',r:'right'}[e.n],angle:e.a||0})}})});return d}
 let ops=null,SM=null;
-function render(){try{const P=JSON.parse($('json').value);ops=build(P);$('prev').innerHTML=ops.map(svg).join('<div style="height:12px"></div>');$('err').textContent=''}catch(e){ops=null;$('err').textContent='Error: '+e.message}}
+const clean=t=>t.replace(/```json|```/g,'').trim();
+const num=v=>parseFloat(v),R1=v=>Math.round(v*10)/10;
+function readText(t0){const T=t0.replace(/[\u201c\u201d]/g,'"').replace(/\u00a0/g,' ').replace(/\u00d8|\u2300/g,'\u00d8'),lines=T.split(/\n|;/);
+const g=re=>re.exec(T),P={density:2.7,rev:'P1 (PRELIM)',drawn:'v0',date:new Date().toISOString().slice(0,10),notes:[],holes:[],pockets:null,tbc:[],tolOD:'',tolT:'',bore:0},got=[],miss=[];
+let m=g(/\(([A-Z0-9]+(?:-[A-Z0-9]+)+)\)/)||g(/\b([A-Z]{2,}[A-Z0-9]*(?:-[A-Z0-9]+){1,4})\b/);P.partNumber=m?m[1]:'PART-01';
+m=g(/part\s*\d*\s*[:\-]\s*([^\n(]+)/i)||g(/title\s*[:\-]\s*([^\n(]+)/i);P.title=((m?m[1]:(lines[0]||'PART').split(/[.:(]/)[0].replace(P.partNumber,'')).trim().toUpperCase().slice(0,40))||'PART';
+m=g(/(?:role|function|purpose)\s*[:\-]\s*([^\n.]+)/i);P.subtitle=m?m[1].trim().toUpperCase().slice(0,62):'';
+const grade=(g(/(\d{4}-T\d+)/)||[])[1]||'',form=/billet/i.test(T)?'BILLET':/plate/i.test(T)?'PLATE':'',isAl=/alumin/i.test(T);
+const dens={'7075':2.81,'6061':2.70,'2024':2.78,'5083':2.66};P.density=grade?dens[grade.slice(0,4)]||2.7:/stainless|316|304/i.test(T)?8.0:/steel/i.test(T)?7.85:/titanium/i.test(T)?4.43:2.7;
+const mm=g(/material\s*[:\-]?\s*([^\n(,]+)/i);const base=isAl?'AL '+grade:(mm?mm[1].trim().toUpperCase().slice(0,24):'MATERIAL TBC');
+const tk=g(/(?:thickness|thk|thick)[^\d\n]*?([\d.]+)/i)||g(/([\d.]+)\s*mm\s*(?:thick|thk)/i),od=g(/(?:outer\s*diameter|\bO\.?D\.?\b)[^\d\n]*?([\d.]+)/i),bo=g(/(?:inner\s*(?:clearance\s*)?(?:bore|diameter)|clearance\s*bore|\bbore\b|\bI\.?D\.?\b)[^\d\n]*?([\d.]+)/i);
+P.od=od?num(od[1]):0;P.thk=tk?num(tk[1]):0;P.bore=bo?num(bo[1]):0;
+P.material=base.trim()+(P.thk?' ('+P.thk+' THK'+(form?' '+form:'')+')':'');
+if(od)got.push('OD '+P.od);else miss.push('outer diameter');if(tk)got.push('thickness '+P.thk);else miss.push('thickness');if(bo)got.push('bore '+P.bore);if(grade||mm)got.push('material');
+m=g(/(?:outer\s*diameter|\bOD\b)[^\n]*?\u00b1\s*([\d.]+)/i);if(m)P.tolOD='\u00b1'+m[1];m=g(/thick[^\n]*?\u00b1\s*([\d.]+)/i);if(m)P.tolT='\u00b1'+m[1];
+// pockets
+if(/pocket/i.test(T)&&P.od){const pl=lines.filter(l=>/pocket|rib|floor/i.test(l)&&!/pcd/i.test(l)).join(' '),f=re=>{const x=re.exec(pl);return x?num(x[1]):0};let asm=0;
+const n=f(/(\d+)\s*(?:x\s*)?pockets?/i)||f(/pockets?\s*[:=\-]\s*(\d+)/i)||(asm=1,12),dp=f(/([\d.]+)\s*(?:mm\s*)?(?:dp|deep|depth)\b/i)||f(/(?:depth|deep)[^\d]*?([\d.]+)/i)||(asm=1,R1(P.thk*.75)),fl=f(/([\d.]+)\s*(?:mm\s*)?floor/i)||f(/floor[^\d]*?([\d.]+)/i)||R1(P.thk-dp),rb=f(/ribs?[^\d]*?([\d.]+)/i)||(asm=1,Math.round(P.od*.021)),cr=f(/R\s*([\d.]+)\s*corner/i)||(asm=1,Math.round(rb/2));
+P.pockets={n,depth:dp,floor:fl,rib:rb,corner:cr};if(asm)P.tbc.push('pockets');got.push(n+' pockets')}
+// holes
+const gl='ABCDEFGH';lines.forEach(l=>{const q=/(\d+)\s*[x\u00d7]\s*(?:\u00d8|dia\w*\.?\s*|M)?([\d.]+)/i.exec(l),pc=/([\d.]+)\s*(?:mm\s*)?(?:pcd|bcd|pitch\s*circle)/i.exec(l)||/(?:pcd|bcd|pitch\s*circle(?:\s*diameter)?|bolt\s*circle)[^\d\n]*?([\d.]+)/i.exec(l);if(!q||!pc||P.holes.length>=8)return;
+const h={tag:gl[P.holes.length],qty:+q[1],dia:num(q[2]),pcd:num(pc[1]),start:0},th=/\b(M\d+(?:\.\d+)?)(?:\s*[x\u00d7]\s*([\d.]+))?/.exec(l),dp=/(?:[x\u00d7]|depth|deep)\s*([\d.]+)\s*(?:dp|deep|depth)/i.exec(l)||/([\d.]+)\s*(?:dp|deep)/i.exec(l),cb=/c.?bore\s*(?:\u00d8|dia\w*\.?\s*)?([\d.]+)\s*[x\u00d7]\s*([\d.]+)/i.exec(l),bs=/boss\s*(?:\u00d8|dia\w*\.?\s*)?([\d.]+)/i.exec(l),st=/start\w*\s*(?:at)?\s*([\d.]+)/i.exec(l),an=/(?:\bat\b|angles?)[:\s]+((?:\d+(?:\.\d+)?\s*\u00b0?\s*(?:deg\w*)?\s*(?:,|and|&)?\s*)+)/i.exec(l);
+const dr=/drill\w*\s*(?:\u00d8|dia\w*\.?\s*)?([\d.]+)/i.exec(l);if(dr)h.dia=num(dr[1]);if(th){h.thread=th[1]+(th[2]?' \u00d7 '+th[2]:'');h.depth=dp?num(dp[1]):R1(h.dia*3)}else if(dp&&!/thru|through/i.test(l))h.depth=num(dp[1]);if(cb)h.cbore={dia:num(cb[1]),depth:num(cb[2])};if(bs)h.boss=num(bs[1]);if(st)h.start=num(st[1]);
+if(an){const a=an[1].match(/\d+(?:\.\d+)?/g).map(num);if(a.length==h.qty)h.angles=a}
+h.desc=(h.thread?h.thread+'|DRILL \u00d8'+h.dia+' \u00d7 '+h.depth+' DP':'\u00d8'+h.dia+(h.depth?' \u00d7 '+h.depth+' DP':' THRU')+(h.cbore?', C\u2019BORE \u00d8'+h.cbore.dia+' \u00d7 '+h.cbore.depth+' DP':'')+(h.boss?'|ON BOSS \u00d8'+h.boss:''));P.holes.push(h)});
+if(P.holes.length)got.push(P.holes.length+' hole group'+(P.holes.length>1?'s':''));else miss.push('hole data');
+const ex=[...new Set((T.match(/\b(lugs?|pick-?up|clamp\w*|anchor\w*|slots?|keyways?|threads?)\b/gi)||[]).map(x=>x.toLowerCase()))];
+P.notes=['ALL DIMENSIONS IN MILLIMETRES. DO NOT SCALE DRAWING.','MATERIAL: '+P.material.toUpperCase()+'.','UNTOLERANCED DIMENSIONS PER ISO 2768-m.'].concat(P.pockets?['POCKETS MACHINED FROM TOP FACE: '+P.pockets.n+'X, '+P.pockets.depth+' DP, '+P.pockets.floor+' FLOOR, R'+P.pockets.corner+' CORNERS, RIBS '+P.pockets.rib+' WIDE.']:[],['BREAK ALL SHARP EDGES 0.5 \u00d7 45\u00b0. DEBURR AND CLEAN.']);
+P.prelim=['From data: '+got.join(', ')+'.','Not defined: '+(miss.concat(ex.length?[ex.join(', ')+' (mentioned, no data)']:[]).join(', ')||'none')+'.','Confirm all data before release.'];
+return{P,msg:'Read: '+(got.join(', ')||'nothing')+'.'+(miss.length?' Missing: '+miss.join(', ')+'.':'')+(ex.length?' Mentioned but not drawn: '+ex.join(', ')+'.':'')+(P.tbc.length?' Assumed values are marked (TBC).':'')}}
+function render(){$('err').style.color='';try{let raw=clean($('json').value),note='';if(raw&&raw[0]!='{'){const r=readText(raw);raw=JSON.stringify(r.P,null,1);$('json').value=raw;note=r.msg}const P=JSON.parse(raw);if(!(P.od>0&&P.thk>0))throw new Error('Could not find outer diameter and thickness. Add them to the text, for example "Outer diameter: 600 mm" and "Thickness: 24 mm".');ops=build(P);$('prev').innerHTML=ops.map(svg).join('<div style="height:12px"></div>');$('err').textContent=note;if(note)$('err').style.color='var(--ac)'}catch(e){ops=null;$('err').textContent='Error: '+e.message}}
 $('json').value=JSON.stringify(DEF,null,1);render();$('upd').onclick=render;
-const MODEL='claude-sonnet-5-5',KEY='ant_key',kb=$('key');
-try{kb.value=localStorage.getItem(KEY)||''}catch(e){}
-$('forget').onclick=()=>{kb.value='';try{localStorage.removeItem(KEY)}catch(e){}};
-$('read').onclick=async()=>{const k=kb.value.trim();if(!k){$('err').textContent='Enter your Anthropic API key first.';return}
-if($('rem').checked)try{localStorage.setItem(KEY,k)}catch(e){}
-$('err').textContent='Reading data...';
-try{const r=await fetch('https://api.anthropic.com/v1/messages',{method:'POST',headers:{'content-type':'application/json','x-api-key':k,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},body:JSON.stringify({model:MODEL,max_tokens:2000,messages:[{role:'user',content:PROMPT+$('spec').value}]})});
-const d=await r.json();if(!r.ok)throw new Error(d.error&&d.error.message||r.status);
-const t=d.content.map(c=>c.text||'').join('').replace(/```json|```/g,'').trim();
-$('json').value=JSON.stringify(JSON.parse(t),null,1);render()}catch(e){$('err').textContent='Could not read data: '+e.message}};
-$('dl').onclick=()=>{if(!ops)return render();try{const P=JSON.parse($('json').value);pdf(ops).save((P.partNumber||'drawing')+'.pdf')}catch(e){$('err').textContent='Download failed: '+e.message}};
+$('auto').onclick=()=>{const r=readText($('spec').value);$('json').value=JSON.stringify(r.P,null,1);render();if(ops){$('err').style.color='var(--ac)';$('err').textContent=r.msg}};
+$('read').onclick=async()=>{const t=PROMPT+$('spec').value;try{await navigator.clipboard.writeText(t);$('err').style.color='var(--ac)';$('err').textContent='Copied. Paste it into a new Claude chat, then paste the reply into the Parameters box.'}catch(e){window.prompt('Copy this text (Ctrl+C), then paste it into Claude:',t)}};
+$('dl').onclick=()=>{if(!ops)return render();try{const P=JSON.parse(clean($('json').value));pdf(ops).save((P.partNumber||'drawing')+'.pdf')}catch(e){$('err').textContent='Download failed: '+e.message}};
 </script></body></html>
