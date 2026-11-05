@@ -4,164 +4,269 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 <style>
-:root{--bg:#f6f5f1;--fg:#1d1d1b;--card:#fff;--bd:#d4d1c7;--ac:#1f5f8b;--mu:#6b6860;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+:root{--bg:#f6f5f1;--fg:#1d1d1b;--card:#fff;--bd:#d4d1c7;--ac:#1f5f8b;--mu:#6b6860;box-sizing:border-box}
 @media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#1b1b19;--fg:#ece9e0;--card:#262624;--bd:#3d3b36;--ac:#6fb3e0;--mu:#a09d92}}
-:root[data-theme="dark"]{--bg:#1b1b19;--fg:#ece9e0;--card:#262624;--bd:#3d3b36;--ac:#6fb3e0;--mu:#a09d92}
-html,body{margin:0}body{background:var(--bg);color:var(--fg);font:14px/1.45 system-ui,-apple-system,Segoe UI,Roboto,sans-serif;padding:16px}
+html,body{margin:0;background:var(--bg);color:var(--fg);font:14px/1.45 system-ui,-apple-system,Segoe UI,Roboto,sans-serif;padding:16px}
 h1{font-size:20px;margin:0 0 4px}p.s{color:var(--mu);margin:0 0 14px}
-.g{display:grid;grid-template-columns:minmax(300px,400px) 1fr;gap:16px}@media(max-width:880px){.g{grid-template-columns:1fr}}
-.c{background:var(--card);border:1px solid var(--bd);border-radius:10px;padding:12px}
-label{display:block;font-weight:600;margin:8px 0 4px}
+.g{display:grid;grid-template-columns:minmax(330px,440px) 1fr;gap:16px}@media(max-width:960px){.g{grid-template-columns:1fr}}
+.c{background:var(--card);border:1px solid var(--bd);border-radius:10px;padding:14px}
+label{display:block;font-weight:600;margin:8px 0 3px;font-size:11px;text-transform:uppercase;letter-spacing:.5px;color:var(--mu)}
 textarea{width:100%;box-sizing:border-box;background:var(--bg);color:var(--fg);border:1px solid var(--bd);border-radius:6px;padding:8px;font:12px/1.4 ui-monospace,Menlo,Consolas,monospace}
-button{background:var(--ac);color:#fff;border:0;border-radius:6px;padding:8px 12px;font:600 13px system-ui;cursor:pointer;margin:8px 8px 0 0}
+select,input[type="text"]{width:100%;box-sizing:border-box;background:var(--bg);color:var(--fg);border:1px solid var(--bd);border-radius:6px;padding:6px 8px;font:13px system-ui;margin-bottom:4px}
+button{background:var(--ac);color:#fff;border:0;border-radius:6px;padding:8px 12px;font:600 13px system-ui;cursor:pointer;margin:4px 4px 0 0}
 button.o{background:none;color:var(--ac);border:1px solid var(--ac)}
-#err{color:#c0392b;min-height:1.2em;margin-top:6px}#prev{overflow-x:auto}#prev svg{width:100%;min-width:680px;height:auto;display:block;border:1px solid var(--bd)}
+.ctrl-row{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:4px}
+.ctrl-row-4{display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:6px;margin-bottom:6px}
+#err{color:#c0392b;min-height:1.2em;margin-top:6px;font-size:12px}#prev{overflow-x:auto}#prev svg{width:100%;min-width:680px;height:auto;display:block;border:1px solid var(--bd)}
 </style></head><body>
-<h1>Universal Drawing Sheet Generator (Circular &amp; Prismatic)</h1>
-<p class="s">Generate professional ISO/ASME compliant A3 technical drawings for both circular parts (discs, rings, flanges) and rectangular/square parts (brackets, plates, manifolds) with true full-body section cuts.</p>
+<h1>Universal Drawing Sheet Generator (Multi-Scale &amp; Dynamic Sheets)</h1>
+<p class="s">Independent per-view scaling (Top, Section A-A, Section B-B, Isometric), responsive sheet sizing (A4, A3, A2), real-time JSON title reading, and custom preset saving.</p>
 <div class="g">
 <div class="c">
-<label for="json">Part Parameters (JSON)</label>
-<textarea id="json" rows="22" spellcheck="false"></textarea>
-<div style="margin-top:8px">
-  <button id="upd">Update Preview</button>
-  <button id="dl" class="o">Download A3 PDF</button>
-  <button id="load_p06" class="o" style="font-size:11px">Load Part 6 (Foot)</button>
-  <button id="load_rect" class="o" style="font-size:11px">Load Rectangular Bracket</button>
+<div class="ctrl-row">
+  <div>
+    <label for="part_select">Preset Parts</label>
+    <select id="part_select">
+      <option value="CUSTOM">-- Custom Data / Live JSON --</option>
+      <option value="P01">HL-MGSE-P01 (Top Payload Ring)</option>
+      <option value="P02">HL-MGSE-P02 (Bottom Base Plate)</option>
+      <option value="P03">HL-MGSE-P03 (Vertical Support Strut)</option>
+      <option value="P04">HL-MGSE-P04 (Trunnion Bearing Saddle)</option>
+      <option value="P05">HL-MGSE-P05 (Indexer Sector Plate)</option>
+      <option value="P06">HL-MGSE-P06 (Leveling Jack Foot)</option>
+      <option value="PISTON" selected>ENG-PSTN-85MM (Forged Piston)</option>
+    </select>
+  </div>
+  <div>
+    <label for="sheet_size">Sheet Format</label>
+    <select id="sheet_size">
+      <option value="A3" selected>A3 Landscape (420 × 297 mm)</option>
+      <option value="A4">A4 Landscape (297 × 210 mm)</option>
+      <option value="A2">A2 Landscape (594 × 420 mm)</option>
+    </select>
+  </div>
+</div>
+
+<label>Individual View Scale Overrides</label>
+<div class="ctrl-row-4">
+  <div>
+    <label for="scale_top" style="font-size:10px">Top View</label>
+    <select id="scale_top">
+      <option value="AUTO" selected>Auto</option>
+      <option value="1:1">1:1</option>
+      <option value="1:2">1:2</option>
+      <option value="1:2.5">1:2.5</option>
+      <option value="1:5">1:5</option>
+      <option value="1:10">1:10</option>
+    </select>
+  </div>
+  <div>
+    <label for="scale_sec_a" style="font-size:10px">Section A-A</label>
+    <select id="scale_sec_a">
+      <option value="AUTO" selected>Auto</option>
+      <option value="1:1">1:1</option>
+      <option value="1:2">1:2</option>
+      <option value="1:2.5">1:2.5</option>
+      <option value="1:5">1:5</option>
+      <option value="1:10">1:10</option>
+    </select>
+  </div>
+  <div>
+    <label for="scale_sec_b" style="font-size:10px">Section B-B</label>
+    <select id="scale_sec_b">
+      <option value="AUTO" selected>Auto</option>
+      <option value="1:1">1:1</option>
+      <option value="1:2">1:2</option>
+      <option value="1:2.5">1:2.5</option>
+      <option value="1:5">1:5</option>
+      <option value="1:10">1:10</option>
+    </select>
+  </div>
+  <div>
+    <label for="scale_iso" style="font-size:10px">3D View</label>
+    <select id="scale_iso">
+      <option value="AUTO" selected>Auto-Fit</option>
+      <option value="0.75">0.75×</option>
+      <option value="1.0">1.0×</option>
+      <option value="1.25">1.25×</option>
+      <option value="1.5">1.5×</option>
+    </select>
+  </div>
+</div>
+
+<div class="ctrl-row" style="margin-top:4px">
+  <input type="text" id="custom_part_name" placeholder="Save preset as (e.g. My Part)..." />
+  <button id="btn_save_preset" class="o" style="margin-top:0;height:34px">Save into Presets</button>
+</div>
+
+<label for="json">Part Parameters (Live JSON - Reads title directly)</label>
+<textarea id="json" rows="18" spellcheck="false"></textarea>
+<div style="margin-top:8px;display:flex;gap:8px">
+  <button id="upd" style="flex:1">Update Preview</button>
+  <button id="dl" class="o" style="flex:1">Download PDF</button>
 </div>
 <div id="err"></div>
 </div>
 <div class="c"><div id="prev"></div></div>
 </div>
+
 <script>
 const $=id=>document.getElementById(id);
 const STD=[1, 0.5, 0.4, 0.25, 0.2, 0.1, 0.05, 0.02], pick=r=>STD.find(s=>s<=r)||0.02, sc=s=>s>=1?'1:1':'1:'+(Math.round(1/s*100)/100);
 const R2=v=>Math.round(v*100)/100;
 
-const DEF_CIRC = {
-  "shape": "CIRCULAR",
-  "title": "LEVELING JACK FOOT",
-  "subtitle": "SWIVEL LEVELING PAD & FOUNDATION ANCHOR BASE",
-  "partNumber": "HL-MGSE-P06",
-  "rev": "P3 (FULL-SECTION)",
-  "material": "AL 7075-T6",
-  "density": 2.81,
-  "od": 220,
-  "thk": 42,
-  "bore": 45,
-  "tolOD": "±0.20",
-  "tolT": "±0.10",
-  "tolBore": "±0.03",
-  "pockets": {
-    "n": 3,
-    "depth": 22,
-    "floor": 20,
-    "rib": 22,
-    "corner": 8,
-    "rin": 40,
-    "rout": 88
+const SHEET_DIMS = {
+  A4: [297, 210],
+  A3: [420, 297],
+  A2: [594, 420]
+};
+
+const PRESETS = {
+  P01: {
+    "shape": "CIRCULAR", "title": "TOP PAYLOAD MOUNTING RING", "subtitle": "PAYLOAD ADAPTER INTERFACE FLANGE",
+    "partNumber": "HL-MGSE-P01", "rev": "P1", "material": "AL 7075-T6", "density": 2.81, "od": 720, "thk": 28, "bore": 480,
+    "tolOD": "±0.20", "tolT": "±0.10", "tolBore": "±0.04",
+    "pockets": { "n": 6, "depth": 18, "floor": 10, "rib": 20, "corner": 8, "rin": 270, "rout": 325 },
+    "holes": [
+      { "tag": "A", "qty": 24, "dia": 11.0, "pcd": 680, "start": 0, "step": 15, "desc": "Ø11.0 THRU|24X EQUISPACED ON Ø680 PCD (FOR M10 CRADLE BOLTS)" },
+      { "tag": "B", "qty": 6, "dia": 10.0, "depth": 18.0, "pcd": 550, "angles": [30, 90, 150, 210, 270, 330], "desc": "Ø10.0 H7 REAMED × 18.0 DP|6X ALIGNMENT DOWELS IN 20 mm RIBS" }
+    ],
+    "notes": [
+      "ALL DIMENSIONS IN MILLIMETRES. DO NOT SCALE DRAWING.",
+      "MATERIAL: AL 7075-T6 (AMS 4045 / ASTM B209).", "UNTOLERANCED DIMENSIONS PER ISO 2768-m.",
+      "BREAK ALL SHARP EDGES 0.5 × 45°. DEBURR AND CLEAN.",
+      "FLANGE CONTACT SURFACES FLATNESS AND PARALLELISM: 0.05 mm TIR.",
+      "SURFACE TREATMENT: MIL-A-8625 TYPE III HARD ANODIZE (50 µm).",
+      "6X RIBS 20.0 WIDE EQUISPACED AT 60° (30°, 90°, 150°, 210°, 270°, 330°).",
+      "EVALUATED FINISHED MASS: 12.73 kg."
+    ],
+    "drawn": "v4", "date": "2026-11-05"
   },
-  "holes": [
-    {
-      "tag": "A",
-      "qty": 4,
-      "dia": 18.0,
-      "pcd": 175,
-      "start": 45,
-      "step": 90,
-      "desc": "Ø18.0 THRU|4X EQUISPACED ON Ø175 PCD (FOR M16 FLOOR ANCHORS)"
-    },
-    {
-      "tag": "B",
-      "qty": 3,
-      "dia": 6.8,
-      "depth": 16.0,
-      "thread": "M8 × 1.25 × 12 DP",
-      "pcd": 130,
-      "angles": [60, 180, 300],
-      "desc": "M8 × 1.25 × 12 DP|DRILL Ø6.8 × 16 DP (3X IN RIBS AT 60°, 180°, 300°)"
-    }
-  ],
-  "notes": [
-    "ALL DIMENSIONS IN MILLIMETRES. DO NOT SCALE DRAWING.",
-    "MATERIAL: AL 7075-T6 (AMS 4045 / ASTM B209).",
-    "UNTOLERANCED DIMENSIONS PER ISO 2768-m.",
-    "BREAK ALL SHARP EDGES 0.5 × 45°. DEBURR AND CLEAN.",
-    "BASE CONTACT SURFACE FLATNESS: 0.05 mm TIR.",
-    "CENTRAL BORE Ø45.0 ACCEPTS SPHERICAL STUD LEVELING SPINDLE.",
-    "SURFACE TREATMENT: MIL-A-8625 TYPE III HARD ANODIZE, CLASS 1 CLEAR (50 µm).",
-    "3X RIBS 22.0 WIDE EQUISPACED AT 120° (AT 60°, 180°, 300°).",
-    "EVALUATED FINISHED MASS: 3.18 kg."
-  ],
-  "drawn": "v3",
-  "date": "2026-11-05"
+  P02: {
+    "shape": "CIRCULAR", "title": "BOTTOM INTERFACE BASE PLATE", "subtitle": "FOUNDATION RING WITH INTEGRAL LIFTING LUGS",
+    "partNumber": "HL-MGSE-P02", "rev": "P1", "material": "AL 7075-T6", "density": 2.81, "od": 780, "thk": 35, "bore": 280,
+    "tolOD": "±0.25", "tolT": "±0.12", "tolBore": "±0.05",
+    "lugs": { "qty": 3, "angles": [0, 120, 240], "reachRadius": 415, "lugNoseRadius": 25, "pinCenterRadius": 390, "pinHoleDia": 25 },
+    "pockets": { "n": 6, "depth": 22, "floor": 13, "rib": 24, "corner": 10, "rin": 180, "rout": 340 },
+    "holes": [
+      { "tag": "A", "qty": 18, "dia": 14.0, "pcd": 740, "start": 0, "step": 20, "desc": "Ø14.0 THRU|18X EQUISPACED ON Ø740 PCD (M12 STRUT BOLTS)" },
+      { "tag": "B", "qty": 6, "dia": 12.0, "depth": 22.0, "pcd": 625, "angles": [30, 90, 150, 210, 270, 330], "desc": "Ø12.0 H7 REAMED × 22.0 DP|6X PRECISION LOCATING PINS" }
+    ],
+    "notes": [
+      "ALL DIMENSIONS IN MILLIMETRES. DO NOT SCALE DRAWING.", "MATERIAL: AL 7075-T6 (AMS 4045 / ASTM B209).",
+      "UNTOLERANCED DIMENSIONS PER ISO 2768-m.", "BREAK ALL SHARP EDGES 0.5 × 45°. DEBURR AND CLEAN.",
+      "3X INTEGRAL LIFTING LUGS PROOF TESTED TO 25.0 kN HOOK LOAD EACH.",
+      "BASE CONTACT SURFACE FLATNESS: 0.08 mm TIR.", "SURFACE TREATMENT: MIL-A-8625 TYPE III HARD ANODIZE (50 µm).",
+      "EVALUATED FINISHED MASS: 22.15 kg."
+    ],
+    "drawn": "v4", "date": "2026-11-05"
+  },
+  P03: {
+    "shape": "PRISMATIC", "title": "VERTICAL SUPPORT STRUT", "subtitle": "MAIN MGSE UPRIGHT STRUCTURAL COLUMN",
+    "partNumber": "HL-MGSE-P03", "rev": "P1", "material": "AL 7075-T6", "density": 2.81, "length": 420, "width": 140, "thk": 45,
+    "corner_radius": 10, "tolL": "±0.20", "tolW": "±0.15", "tolT": "±0.10",
+    "pockets": [ { "x": 60, "y": 25, "w": 300, "h": 90, "depth": 28, "floor": 17, "corner": 10, "desc": "CENTRAL LIGHTENING POCKET 28 DP, 17 FLOOR" } ],
+    "holes": [
+      { "tag": "A", "qty": 4, "dia": 14.0, "cbore": { "dia": 20.0, "depth": 14.0 }, "coords": [[25, 30], [25, 110], [395, 30], [395, 110]], "desc": "Ø14.0 THRU, C'BORE Ø20.0 × 14.0 DP|4X TOP/BOTTOM TIE BOLTS" },
+      { "tag": "B", "qty": 2, "dia": 10.0, "depth": 22.0, "coords": [[25, 70], [395, 70]], "desc": "Ø10.0 H7 REAMED × 22.0 DP|2X SHEAR ALIGNMENT DOWELS" }
+    ],
+    "notes": [
+      "ALL DIMENSIONS IN MILLIMETRES. DO NOT SCALE DRAWING.", "MATERIAL: AL 7075-T6 (AMS 4045 / ASTM B209).",
+      "UNTOLERANCED DIMENSIONS PER ISO 2768-m.", "BREAK ALL SHARP EDGES 0.5 × 45°. DEBURR AND CLEAN.",
+      "END MOUNTING FACES SQUARE TO SIDES WITHIN 0.04 mm.", "SURFACE TREATMENT: MIL-A-8625 TYPE III HARD ANODIZE (50 µm).",
+      "EVALUATED FINISHED MASS: 4.88 kg."
+    ],
+    "drawn": "v4", "date": "2026-11-05"
+  },
+  P04: {
+    "shape": "PRISMATIC", "title": "TRUNNION BEARING BRACKET", "subtitle": "PAYLOAD ROTATION JOURNAL SADDLE",
+    "partNumber": "HL-MGSE-P04", "rev": "P1", "material": "AL 7075-T6", "density": 2.81, "length": 260, "width": 180, "thk": 55,
+    "corner_radius": 12, "tolL": "±0.15", "tolW": "±0.15", "tolT": "±0.10",
+    "pockets": [ { "x": 35, "y": 25, "w": 190, "h": 130, "depth": 32, "floor": 23, "corner": 10, "desc": "BASE RELIEF POCKET 32 DP, 23 FLOOR" } ],
+    "holes": [
+      { "tag": "A", "qty": 4, "dia": 14.0, "cbore": { "dia": 20.0, "depth": 14.0 }, "coords": [[18, 20], [242, 20], [242, 160], [18, 160]], "desc": "Ø14.0 THRU, C'BORE Ø20.0 × 14.0 DP|4X MOUNTING FASTENERS" },
+      { "tag": "B", "qty": 2, "dia": 12.0, "depth": 24.0, "coords": [[130, 20], [130, 160]], "desc": "Ø12.0 H7 REAMED × 24.0 DP|2X TRANSVERSE ALIGNMENT DOWELS" },
+      { "tag": "C", "qty": 1, "dia": 70.0, "coords": [[130, 90]], "desc": "Ø70.0 H7 (+0.030/-0.000) THRU|1X MAIN TRUNNION BEARING JOURNAL" }
+    ],
+    "notes": [
+      "ALL DIMENSIONS IN MILLIMETRES. DO NOT SCALE DRAWING.", "MATERIAL: AL 7075-T6 (AMS 4045 / ASTM B209).",
+      "UNTOLERANCED DIMENSIONS PER ISO 2768-m.", "BREAK ALL SHARP EDGES 0.5 × 45°. DEBURR AND CLEAN.",
+      "JOURNAL BORE Ø70.0 H7 CYLINDRICITY 0.015 mm, SQUARE TO BASE 0.02 mm.",
+      "SURFACE TREATMENT: MIL-A-8625 TYPE III HARD ANODIZE (50 µm).", "EVALUATED FINISHED MASS: 5.12 kg."
+    ],
+    "drawn": "v4", "date": "2026-11-05"
+  },
+  P05: {
+    "shape": "CIRCULAR", "title": "INDEXER SECTOR PLATE", "subtitle": "PAYLOAD ROTATION & TILT POSITIVE LOCKING SECTOR",
+    "partNumber": "HL-MGSE-P05", "rev": "P3", "material": "AL 7075-T6", "density": 2.81, "od": 320, "thk": 20, "bore": 120,
+    "tolOD": "±0.15", "tolT": "±0.08", "tolBore": "±0.025",
+    "pockets": { "n": 4, "depth": 12, "floor": 8, "rib": 18, "corner": 6, "rin": 80, "rout": 135 },
+    "holes": [
+      { "tag": "A", "qty": 8, "dia": 9.0, "pcd": 280, "start": 22.5, "step": 45, "desc": "Ø9.0 THRU|8X EQUISPACED ON Ø280 PCD (M8 MOUNTING BOLTS)" },
+      { "tag": "B", "qty": 7, "dia": 12.0, "pcd": 220, "angles": [0, 15, 30, 45, 60, 75, 90], "desc": "Ø12.0 H7 REAMED THRU (+0.018/-0.000)|7X INDEXING BUSHING BORES (0° TO 90° IN 15° STEPS)" },
+      { "tag": "C", "qty": 2, "dia": 8.0, "depth": 5.0, "pcd": 160, "angles": [90, 270], "desc": "Ø8.0 H7 REAMED × 5.0 DP|2X BLIND ALIGNMENT HOLES (IN 8.0 FLOOR)" }
+    ],
+    "notes": [
+      "ALL DIMENSIONS IN MILLIMETRES. DO NOT SCALE DRAWING.", "MATERIAL: AL 7075-T6 (AMS 4045 / ASTM B209).",
+      "UNTOLERANCED DIMENSIONS PER ISO 2768-m.", "BREAK ALL SHARP EDGES 0.5 × 45°. DEBURR AND CLEAN.",
+      "INDEXING HOLES Ø12.0 H7 TRUE POSITION 0.025 mm TO DATUM AXIS.",
+      "HOLE C DEPTH HELD TO 5.0 mm MAX TO PRESERVE 3.0 mm MIN REMAINING FLOOR.",
+      "PLATE FLATNESS AND PARALLELISM: 0.05 mm TIR.", "SURFACE TREATMENT: MIL-A-8625 TYPE III HARD ANODIZE (50 µm).",
+      "EVALUATED FINISHED MASS: 2.69 kg."
+    ],
+    "drawn": "v4", "date": "2026-11-05"
+  },
+  P06: {
+    "shape": "CIRCULAR", "title": "LEVELING JACK FOOT", "subtitle": "SWIVEL LEVELING PAD & FOUNDATION ANCHOR BASE",
+    "partNumber": "HL-MGSE-P06", "rev": "P3", "material": "AL 7075-T6", "density": 2.81, "od": 220, "thk": 42, "bore": 45,
+    "tolOD": "±0.20", "tolT": "±0.10", "tolBore": "±0.03",
+    "pockets": { "n": 3, "depth": 22, "floor": 20, "rib": 22, "corner": 8, "rin": 40, "rout": 88 },
+    "holes": [
+      { "tag": "A", "qty": 4, "dia": 18.0, "pcd": 175, "start": 45, "step": 90, "desc": "Ø18.0 THRU|4X EQUISPACED ON Ø175 PCD (FOR M16 FLOOR ANCHORS)" },
+      { "tag": "B", "qty": 3, "dia": 6.8, "depth": 16.0, "thread": "M8 × 1.25 × 12 DP", "pcd": 130, "angles": [60, 180, 300], "desc": "M8 × 1.25 × 12 DP|DRILL Ø6.8 × 16 DP (3X IN RIBS AT 60°, 180°, 300°)" }
+    ],
+    "notes": [
+      "ALL DIMENSIONS IN MILLIMETRES. DO NOT SCALE DRAWING.", "MATERIAL: AL 7075-T6 (AMS 4045 / ASTM B209).",
+      "UNTOLERANCED DIMENSIONS PER ISO 2768-m.", "BREAK ALL SHARP EDGES 0.5 × 45°. DEBURR AND CLEAN.",
+      "BASE CONTACT SURFACE FLATNESS: 0.05 mm TIR.", "CENTRAL BORE Ø45.0 ACCEPTS SPHERICAL STUD LEVELING SPINDLE.",
+      "SURFACE TREATMENT: MIL-A-8625 TYPE III HARD ANODIZE, CLASS 1 CLEAR (50 µm).",
+      "3X RIBS 22.0 WIDE EQUISPACED AT 120° (AT 60°, 180°, 300°).", "EVALUATED FINISHED MASS: 3.18 kg."
+    ],
+    "drawn": "v4", "date": "2026-11-05"
+  },
+  PISTON: {
+    "shape": "CIRCULAR", "title": "FORGED RACING PISTON CROWN", "subtitle": "HIGH-COMPRESSION INTERNAL COMBUSTION PISTON",
+    "partNumber": "ENG-PSTN-85MM", "rev": "A1", "material": "AL 2618-T61", "density": 2.77, "od": 85.0, "thk": 52.0, "bore": 22.0,
+    "tolOD": "+0.015/-0.000", "tolT": "±0.05", "tolBore": "+0.008/-0.000",
+    "pockets": { "n": 2, "depth": 32.0, "floor": 20.0, "rib": 18.0, "corner": 6.0, "rin": 16.0, "rout": 38.0 },
+    "holes": [
+      { "tag": "A", "qty": 4, "dia": 3.0, "pcd": 72.0, "start": 45.0, "step": 90.0, "desc": "Ø3.0 THRU|4X OIL RETURN DRAIN DRILLINGS" },
+      { "tag": "B", "qty": 2, "dia": 4.0, "depth": 14.0, "pcd": 50.0, "angles": [90.0, 270.0], "desc": "Ø4.0 × 14.0 DP|2X OIL JET SPRAY PASSAGES" }
+    ],
+    "notes": [
+      "ALL DIMENSIONS IN MILLIMETRES. DO NOT SCALE DRAWING.", "MATERIAL: AL 2618-T61 (FORGED HIGH-TEMPERATURE AUTOMOTIVE ALLOY).",
+      "UNTOLERANCED DIMENSIONS PER ISO 2768-m.", "BREAK ALL SHARP EDGES 0.3 × 45°. DEBURR AND ULTRASONIC CLEAN.",
+      "SKIRT AND PISTON PIN BORE PERPENDICULARITY: 0.010 mm.", "WRIST PIN BORE Ø22.0 +0.008/-0.000 FINISH: Ra 0.2 µm DIAMOND HONE.",
+      "SURFACE TREATMENT: ANODIZED CROWN DOME + MOLY SKIRT COATING (25 µm).", "EVALUATED FINISHED MASS: 0.42 kg."
+    ],
+    "drawn": "v4", "date": "2026-11-05"
+  }
 };
 
-const DEF_RECT = {
-  "shape": "PRISMATIC",
-  "title": "TRUNNION BASE ADAPTER BLOCK",
-  "subtitle": "HEAVY HANDLING MGSE MOUNTING SADDLE",
-  "partNumber": "HL-MGSE-P07",
-  "rev": "P1 (INITIAL)",
-  "material": "AL 7075-T6",
-  "density": 2.81,
-  "length": 260,
-  "width": 180,
-  "thk": 38,
-  "corner_radius": 12,
-  "tolL": "±0.15",
-  "tolW": "±0.15",
-  "tolT": "±0.10",
-  "pockets": [
-    { "x": 30, "y": 25, "w": 200, "h": 130, "depth": 22, "floor": 16, "corner": 8, "desc": "RECESS POCKET 22 DP, 16 FLOOR" }
-  ],
-  "holes": [
-    {
-      "tag": "A",
-      "qty": 4,
-      "dia": 14.0,
-      "cbore": { "dia": 20.0, "depth": 13.0 },
-      "coords": [[18, 18], [242, 18], [242, 162], [18, 162]],
-      "desc": "Ø14.0 THRU, C'BORE Ø20.0 × 13.0 DP|4X CORNER TIE-DOWN BOLTS"
-    },
-    {
-      "tag": "B",
-      "qty": 2,
-      "dia": 10.0,
-      "depth": 20.0,
-      "coords": [[130, 20], [130, 160]],
-      "desc": "Ø10.0 H7 REAMED × 20.0 DP|2X TRANSVERSE ALIGNMENT DOWELS"
-    },
-    {
-      "tag": "C",
-      "qty": 4,
-      "dia": 8.5,
-      "depth": 22.0,
-      "thread": "M10 × 1.5 × 16 DP",
-      "coords": [[90, 90], [170, 90], [90, 90], [170, 90]],
-      "desc": "M10 × 1.5 × 16 DP|DRILL Ø8.5 × 22 DP (4X PAYLOAD INTERFACE)"
-    }
-  ],
-  "notes": [
-    "ALL DIMENSIONS IN MILLIMETRES. DO NOT SCALE DRAWING.",
-    "MATERIAL: AL 7075-T6 (AMS 4045 / ASTM B209).",
-    "UNTOLERANCED DIMENSIONS PER ISO 2768-m.",
-    "BREAK ALL SHARP EDGES 0.5 × 45°. DEBURR AND CLEAN.",
-    "DATUM A (BOTTOM BASE) FLATNESS: 0.03 mm.",
-    "SURFACE TREATMENT: MIL-A-8625 TYPE III HARD ANODIZE (50 µm).",
-    "EVALUATED FINISHED MASS: 3.52 kg."
-  ],
-  "drawn": "v1",
-  "date": "2026-11-05"
-};
+function parseRatio(str, fallback=1){
+  if(!str || str === 'AUTO') return fallback;
+  const p = str.split(':');
+  if(p.length === 2 && +p[1]>0) return (+p[0]) / (+p[1]);
+  return fallback;
+}
 
-function build(P){
+function build(P, userSize='A3', scales={top:'AUTO', secA:'AUTO', secB:'AUTO', iso:'AUTO'}){
   const o = [];
   const S = [o];
+  const [sheetW, sheetH] = SHEET_DIMS[userSize] || [420, 297];
   const isPrismatic = (P.shape === 'PRISMATIC' || P.shape === 'RECTANGULAR' || (P.length && P.width));
   const thk = +P.thk || 20;
 
-  // Drawing helpers
   const L = (a,b,c,d,w=.3,s=0,col) => o.push({t:'p',p:[[a,b],[c,d]],w,s,c:col});
   const PL = (p,w=.3,s=0,z=1,f,col) => o.push({t:'p',p,w,s,z,f,c:col});
   const T = (x,y,x_,z=3,n='m',a=0,col,b) => o.push({t:'t',p:[x,y],x:x_,z,n,a,c:col,b});
@@ -177,8 +282,7 @@ function build(P){
     L(x1+nx*1.5*sg, y1+ny*1.5*sg, a[0]+nx*2*sg, a[1]+ny*2*sg, 0.15);
     L(x2+nx*1.5*sg, y2+ny*1.5*sg, b[0]+nx*2*sg, b[1]+ny*2*sg, 0.15);
     L(a[0], a[1], b[0], b[1], 0.25);
-    arrow(a[0], a[1], ux, uy);
-    arrow(b[0], b[1], -ux, -uy);
+    arrow(a[0], a[1], ux, uy); arrow(b[0], b[1], -ux, -uy);
     let ang = Math.atan2(-dy,dx)*180/Math.PI;
     if(ang>90) ang-=180; if(ang<-90) ang+=180;
     T((a[0]+b[0])/2+nx*sg*1.8, (a[1]+b[1])/2+ny*sg*1.8+(Math.abs(dx)>Math.abs(dy)?1:0), txt, 2.7, 'm', ang);
@@ -197,26 +301,34 @@ function build(P){
     }
   }
 
-  // Draw A3 Sheet Frame & Grid Coordinates
   const frame=()=>{
-    Rc(10,10,400,277,0.7); Rc(5,5,410,287,0.2);
-    for(let i=1;i<=8;i++){
-      T(10+(i-.5)*50, 8.6, i, 2.8); T(10+(i-.5)*50, 291.6, i, 2.8);
-      if(i<8){ L(10+i*50, 5, 10+i*50, 10, 0.2); L(10+i*50, 287, 10+i*50, 292, 0.2); }
+    const m = 10;
+    Rc(m, m, sheetW - 2*m, sheetH - 2*m, 0.7);
+    Rc(5, 5, sheetW - 10, sheetH - 10, 0.2);
+    const nCols = 8, colW = (sheetW - 2*m) / nCols;
+    for(let i=1; i<=nCols; i++){
+      T(m + (i - 0.5)*colW, m - 1.4, i, 2.8);
+      T(m + (i - 0.5)*colW, sheetH - m + 4.6, i, 2.8);
+      if(i < nCols){
+        L(m + i*colW, 5, m + i*colW, m, 0.2);
+        L(m + i*colW, sheetH - m, m + i*colW, sheetH - 5, 0.2);
+      }
     }
-    'ABCD'.split('').forEach((c,j)=>{
-      const y=10+(j+.5)*69.25+1;
-      T(7.5, y, c, 2.8); T(412.5, y, c, 2.8);
-      if(j<3){ L(5, 10+(j+1)*69.25, 10, 10+(j+1)*69.25, 0.2); L(410, 10+(j+1)*69.25, 415, 10+(j+1)*69.25, 0.2); }
+    const nRows = 4, rowH = (sheetH - 2*m) / nRows;
+    'ABCD'.split('').forEach((c, j)=>{
+      const y = m + (j + 0.5)*rowH + 1;
+      T(7.5, y, c, 2.8); T(sheetW - 7.5, y, c, 2.8);
+      if(j < 3){
+        L(5, m + (j+1)*rowH, m, m + (j+1)*rowH, 0.2);
+        L(sheetW - m, m + (j+1)*rowH, sheetW - 5, m + (j+1)*rowH, 0.2);
+      }
     });
   };
   frame();
 
-  let topScale = 1;
   let fin_mass = 0, blank_mass = 0, mass_red = 0;
   const H = P.holes || [];
 
-  // POCKET HELPER FUNCTIONS DEFINED IN SHARED SCOPE
   const od = +P.od || 0, bore = +P.bore || 0, pk = P.pockets;
   const rin = pk ? (+pk.rin || bore/2 + 25) : 0;
   const rout = pk ? (+pk.rout || od/2 - 18) : 0;
@@ -229,28 +341,25 @@ function build(P){
     p.forEach((q,k)=>{if(!cs.includes(k)){out.push(q);return;}const A=walk(p,k,-1,rr),B=walk(p,k,1,rr);for(let t=0;t<=6;t++){const u=t/6,v=1-u;out.push([v*v*A[0]+2*v*u*q[0]+u*u*B[0],v*v*A[1]+2*v*u*q[1]+u*u*B[1]])}});return out;
   }
 
-  // Hole points array
   const hp = (!isPrismatic) ? H.flatMap(h=>{
     const q=+h.qty||1, an=h.angles||Array.from({length:q},(_,i)=>(+h.start||0)+i*360/q);
     return an.map(g=>({h,g,x:h.pcd/2*Math.cos(g*Math.PI/180), y:h.pcd/2*Math.sin(g*Math.PI/180)}));
   }) : [];
 
+  const cx = 110 * (sheetW / 420), cy = 118 * (sheetH / 297);
+  const maxEnvelope = isPrismatic ? Math.max(P.length||240, P.width||180) : Math.max(od, (P.lugs?.reachRadius||od/2)*2);
+  const autoTopScale = pick((150 * (sheetW/420)) / maxEnvelope);
+  const topScale = parseRatio(scales.top, autoTopScale);
+
   if(!isPrismatic){
-    // =========================================================================
-    // CIRCULAR PIPELINE WITH TRUE FULL-DIAMETER SECTIONS
-    // =========================================================================
-    const maxDim = Math.max(od, (P.lugs?.reachRadius||od/2)*2);
-    topScale = pick(150 / maxDim);
-    const cx = 110, cy = 118, Rr = od/2*topScale;
+    const Rr = od/2 * topScale;
     const tf = ([x,y]) => [cx + x*topScale, cy - y*topScale];
     const pt = (r,a) => tf([r*Math.cos(a*Math.PI/180), r*Math.sin(a*Math.PI/180)]);
 
-    // Draw Top View
     PL(polar(od/2, 0, 360, 144).map(tf), 0.6);
     PL(polar(od/2-3, 0, 360, 144).map(tf), 0.2);
     if(bore) PL(polar(bore/2, 0, 360, 120).map(tf), 0.6);
 
-    // Lugs
     const lugs = P.lugs;
     if(lugs){
       (lugs.angles||[0,120,240]).forEach(la=>{
@@ -264,10 +373,8 @@ function build(P){
       });
     }
 
-    // Pockets
     if(pk) for(let i=0; i<+pk.n; i++) PL(pocketPoly(i).map(tf), 0.45);
 
-    // Centerlines
     L(cx-Rr-10, cy, cx+Rr+14, cy, 0.15, 4);
     L(cx, cy-Rr-8, cx, cy+Rr+8, 0.15, 4);
 
@@ -277,7 +384,6 @@ function build(P){
       if(p.h.cbore) PL(polar(p.h.cbore.dia/2, 0, 360, 16).map(([a,b])=>tf([a+p.x, b+p.y])), 0.25);
     });
 
-    // Top view dimensions
     const yd = cy - Rr - 12;
     L(cx-Rr, cy, cx-Rr, yd-2, 0.15); L(cx+Rr, cy, cx+Rr, yd-2, 0.15);
     L(cx-Rr, yd, cx+Rr, yd, 0.25); arrow(cx-Rr, yd, 1, 0); arrow(cx+Rr, yd, -1, 0);
@@ -287,7 +393,7 @@ function build(P){
       L(p1[0], p1[1], p2[0], p2[1], 0.25); arrow(p1[0], p1[1], .766, .643); arrow(p2[0], p2[1], -.766, -.643);
       T(cx+2, cy-4, 'Ø'+bore+' BORE', 2.8, 'm', -40);
     }
-    // PCD Callouts
+
     H.forEach((h,i)=>{
       if(!h.pcd) return;
       const aDim = 150 - i*28, leadP = pt(h.pcd/2, aDim), outP = pt(h.pcd/2+14+i*4, aDim);
@@ -298,7 +404,6 @@ function build(P){
       T(txX-1.5, outP[1]+1, 'Ø'+h.pcd+' PCD ('+h.tag+')', 2.5, 'r');
     });
 
-    // Rib / Pocket dimensions on Top view
     if(pk){
       const pIn=pt(rin, 215), pOut=pt(rout, 235);
       L(pIn[0], pIn[1], pIn[0]-14, pIn[1]+8, 0.2); arrow(pIn[0], pIn[1], .88, .47);
@@ -317,7 +422,6 @@ function build(P){
       T(14, 42, 'R'+(pk.corner||8)+' CORNERS, '+(pk.floor||(thk-pk.depth))+' FLOOR', 2.6, 'l');
     }
 
-    // Cutting Plane Arrows (Outer diameter strictly)
     let cutA_ang = 90, cutB_ang = 0;
     if(pk){
       cutB_ang = 0;
@@ -344,20 +448,19 @@ function build(P){
       L(cx - dx*Rr, cy - dy*Rr, cx + dx*Rr, cy + dy*Rr, 0.2, 5);
     });
 
-    T(cx, 202, 'TOP VIEW', 4.2, 'm', 0, 0, 1);
-    T(cx, 206.5, 'SCALE ' + sc(topScale), 2.8);
+    T(cx, 202 * (sheetH/297), 'TOP VIEW', 4.2, 'm', 0, 0, 1);
+    T(cx, (202 * (sheetH/297)) + 4.5, 'SCALE ' + sc(topScale), 2.8);
 
     // =========================================================================
-    // TRUE FULL-DIAMETER SECTION CUTS (EDGE TO EDGE: -OD/2 to +OD/2)
-    // PERFECT SPACING: ZERO COLLISION GUARANTEED
+    // TRUE FULL-DIAMETER SECTIONS WITH INDIVIDUAL SCALE CONTROLS
     // =========================================================================
-    const secScale = pick(130 / od);
-    const secW = od * secScale;
-    const x0 = 265 + (130 - secW)/2;
-    const y0_A = 114;
-    const y0_B = 172; // Placed well below Section A-A title for 16mm clear whitespace!
+    const autoSecScale = pick((130 * (sheetW/420)) / od);
+    const secScaleA = parseRatio(scales.secA, autoSecScale);
+    const secScaleB = parseRatio(scales.secB, autoSecScale);
 
-    function drawFullCircSection(nm, a_deg, y0){
+    const drawCircSec = (nm, a_deg, y0, sRatio) => {
+      const secW = od * sRatio;
+      const x0 = (265 * (sheetW/420)) + ((130 * (sheetW/420)) - secW)/2;
       const step = 0.5;
       const poly = [];
       const inPocketAt = (u) => {
@@ -372,27 +475,24 @@ function build(P){
       for(let u = -od/2; u <= od/2; u += step){
         const r = Math.abs(u);
         let topY = 0;
-        if(bore && r < bore/2){
-          topY = thk;
-        } else if(inPocketAt(u)){
-          topY = +pk.depth;
-        }
-        poly.push([x0 + (u + od/2)*secScale, y0 + topY*secScale]);
+        if(bore && r < bore/2){ topY = thk; }
+        else if(inPocketAt(u)){ topY = +pk.depth; }
+        poly.push([x0 + (u + od/2)*sRatio, y0 + topY*sRatio]);
       }
-      poly.push([x0 + secW, y0 + thk*secScale]);
-      poly.push([x0, y0 + thk*secScale]);
+      poly.push([x0 + secW, y0 + thk*sRatio]);
+      poly.push([x0, y0 + thk*sRatio]);
       PL(poly, 0.5);
 
       hatch((x, y)=>{
-        const u = x/secScale - od/2;
+        const u = x/sRatio - od/2;
         const r = Math.abs(u);
         if(bore && r < bore/2) return false;
-        let topY = inPocketAt(u) ? (+pk.depth)*secScale : 0;
+        let topY = inPocketAt(u) ? (+pk.depth)*sRatio : 0;
         return y > topY + 0.01;
-      }, x0, y0, secW, thk*secScale);
+      }, x0, y0, secW, thk*sRatio);
 
-      const xCenter = x0 + (od/2)*secScale;
-      L(xCenter, y0 - 4, xCenter, y0 + thk*secScale + 4, 0.15, 4);
+      const xCenter = x0 + (od/2)*sRatio;
+      L(xCenter, y0 - 4, xCenter, y0 + thk*sRatio + 4, 0.15, 4);
 
       const holesInCut = H.filter(h => {
         const an = h.angles || Array.from({length:+h.qty||1},(_,i)=>(+h.start||0)+i*360/(+h.qty||1));
@@ -402,33 +502,35 @@ function build(P){
       holesInCut.forEach(h => {
         [-h.pcd/2, h.pcd/2].forEach(pcdOffset => {
           const u = pcdOffset;
-          const xh = x0 + (u + od/2)*secScale;
-          L(xh, y0 - 3, xh, y0 + thk*secScale + 3, 0.12, 3);
+          const xh = x0 + (u + od/2)*sRatio;
+          L(xh, y0 - 3, xh, y0 + thk*sRatio + 3, 0.12, 3);
           const topDepth = inPocketAt(u) ? (+pk.depth) : 0;
           const botDepth = h.depth ? (topDepth + (+h.depth)) : thk;
-          L(xh - (h.dia/2)*secScale, y0 + topDepth*secScale, xh - (h.dia/2)*secScale, y0 + Math.min(botDepth, thk)*secScale, 0.25);
-          L(xh + (h.dia/2)*secScale, y0 + topDepth*secScale, xh + (h.dia/2)*secScale, y0 + Math.min(botDepth, thk)*secScale, 0.25);
+          L(xh - (h.dia/2)*sRatio, y0 + topDepth*sRatio, xh - (h.dia/2)*sRatio, y0 + Math.min(botDepth, thk)*sRatio, 0.25);
+          L(xh + (h.dia/2)*sRatio, y0 + topDepth*sRatio, xh + (h.dia/2)*sRatio, y0 + Math.min(botDepth, thk)*sRatio, 0.25);
           if(h.depth && botDepth < thk){
-            L(xh - (h.dia/2)*secScale, y0 + botDepth*secScale, xh, y0 + (botDepth + h.dia*0.25)*secScale, 0.25);
-            L(xh + (h.dia/2)*secScale, y0 + botDepth*secScale, xh, y0 + (botDepth + h.dia*0.25)*secScale, 0.25);
+            L(xh - (h.dia/2)*sRatio, y0 + botDepth*sRatio, xh, y0 + (botDepth + h.dia*0.25)*sRatio, 0.25);
+            L(xh + (h.dia/2)*sRatio, y0 + botDepth*sRatio, xh, y0 + (botDepth + h.dia*0.25)*sRatio, 0.25);
           }
         });
       });
 
       dim(x0, y0, x0 + secW, y0, -8, 'Ø' + od + ' FULL WIDTH');
-      dim(x0, y0, x0, y0 + thk*secScale, 10, thk + ' ' + (P.tolT||''));
+      dim(x0, y0, x0, y0 + thk*sRatio, 10, thk + ' ' + (P.tolT||''));
       if(pk && inPocketAt(rout - 5)){
-        const xP1 = x0 + (od/2 + rin)*secScale, xP2 = x0 + (od/2 + rout)*secScale;
+        const xP1 = x0 + (od/2 + rin)*sRatio, xP2 = x0 + (od/2 + rout)*sRatio;
         dim(xP1, y0, xP2, y0, -14, R2(rout-rin) + ' POCKET');
-        dim(x0 + secW, y0 + (+pk.depth)*secScale, x0 + secW, y0 + thk*secScale, -8, (pk.floor||(thk-pk.depth)) + ' FLOOR');
+        dim(x0 + secW, y0 + (+pk.depth)*sRatio, x0 + secW, y0 + thk*sRatio, -8, (pk.floor||(thk-pk.depth)) + ' FLOOR');
       }
 
-      T(x0, y0 + thk*secScale + 7, 'SECTION ' + nm + '-' + nm, 4.2, 'l', 0, 0, 1);
-      T(x0 + 44, y0 + thk*secScale + 7, 'SCALE ' + sc(secScale) + ' (FULL-DIAMETER CUT, ' + a_deg + '°)', 2.6, 'l');
-    }
+      T(x0, y0 + thk*sRatio + 7, 'SECTION ' + nm + '-' + nm, 4.2, 'l', 0, 0, 1);
+      T(x0 + 44, y0 + thk*sRatio + 7, 'SCALE ' + sc(sRatio) + ' (FULL-DIAMETER CUT, ' + a_deg + '°)', 2.6, 'l');
+    };
 
-    drawFullCircSection(cuts[0][0], cuts[0][1], y0_A);
-    drawFullCircSection(cuts[1][0], cuts[1][1], y0_B);
+    const y0_A = 114 * (sheetH / 297);
+    const y0_B = y0_A + thk*secScaleA + (32 * (sheetH / 297));
+    drawCircSec(cuts[0][0], cuts[0][1], y0_A, secScaleA);
+    drawCircSec(cuts[1][0], cuts[1][1], y0_B, secScaleB);
 
     const dn = +P.density || 2.81, kg = v => v/1e6 * dn;
     const Vs = Math.PI * (od/2)**2 * thk, Vb = Math.PI * (bore/2)**2 * thk;
@@ -439,17 +541,12 @@ function build(P){
     mass_red = (1 - fin_mass/blank_mass)*100;
 
   } else {
-    // =========================================================================
-    // PRISMATIC / RECTANGULAR PIPELINE WITH FULL TRANSVERSE & LONGITUDINAL CUTS
-    // =========================================================================
+    // PRISMATIC PIPELINE
     const L_part = +P.length || 240, W_part = +P.width || 180;
-    topScale = pick(150 / Math.max(L_part, W_part));
-    const cx = 110, cy = 118;
     const leftX = cx - (L_part/2)*topScale, topY = cy - (W_part/2)*topScale;
     const wScaled = L_part * topScale, hScaled = W_part * topScale;
 
     Rc(leftX, topY, wScaled, hScaled, 0.6);
-
     L(leftX - 8, cy, leftX + wScaled + 8, cy, 0.15, 4);
     L(cx, topY - 8, cx, topY + hScaled + 8, 0.15, 4);
 
@@ -491,12 +588,16 @@ function build(P){
     L(leftX - 4, cutB_Y, leftX - 12, cutB_Y, 0.8); L(leftX - 12, cutB_Y, leftX - 12, cutB_Y - 6, 0.3); arrow(leftX - 12, cutB_Y - 6, 0, 1); T(leftX - 12, cutB_Y - 9, 'B', 4, 'm', 0, 0, 1);
     L(leftX + wScaled + 4, cutB_Y, leftX + wScaled + 12, cutB_Y, 0.8); L(leftX + wScaled + 12, cutB_Y, leftX + wScaled + 12, cutB_Y - 6, 0.3); arrow(leftX + wScaled + 12, cutB_Y - 6, 0, 1); T(leftX + wScaled + 12, cutB_Y - 9, 'B', 4, 'm', 0, 0, 1);
 
-    T(cx, 202, 'TOP VIEW', 4.2, 'm', 0, 0, 1);
-    T(cx, 206.5, 'SCALE ' + sc(topScale), 2.8);
+    T(cx, 202 * (sheetH/297), 'TOP VIEW', 4.2, 'm', 0, 0, 1);
+    T(cx, (202 * (sheetH/297)) + 4.5, 'SCALE ' + sc(topScale), 2.8);
 
-    const secScaleA = pick(130 / W_part);
+    const autoSecScaleA = pick((130 * (sheetW/420)) / W_part);
+    const autoSecScaleB = pick((130 * (sheetW/420)) / L_part);
+    const secScaleA = parseRatio(scales.secA, autoSecScaleA);
+    const secScaleB = parseRatio(scales.secB, autoSecScaleB);
+
     const secWA = W_part * secScaleA;
-    const x0_A = 265 + (130 - secWA)/2, y0_A = 114;
+    const x0_A = (265 * (sheetW/420)) + ((130 * (sheetW/420)) - secWA)/2, y0_A = 114 * (sheetH/297);
 
     function drawPrismaticSectionA(){
       const pkCut = pks.find(p => (L_part/2) >= p.x && (L_part/2) <= (p.x + p.w));
@@ -527,9 +628,8 @@ function build(P){
       T(x0_A + 38, y0_A + thk*secScaleA + 7, 'SCALE ' + sc(secScaleA) + ' (FULL TRANSVERSE CUT)', 2.6, 'l');
     }
 
-    const secScaleB = pick(130 / L_part);
     const secWB = L_part * secScaleB;
-    const x0_B = 265 + (130 - secWB)/2, y0_B = 172;
+    const x0_B = (265 * (sheetW/420)) + ((130 * (sheetW/420)) - secWB)/2, y0_B = y0_A + thk*secScaleA + (32 * (sheetH/297));
 
     function drawPrismaticSectionB(){
       const pkCut = pks.find(p => (W_part/2) >= p.y && (W_part/2) <= (p.y + p.h));
@@ -572,49 +672,54 @@ function build(P){
     mass_red = (1 - fin_mass/blank_mass)*100;
   }
 
-  // =========================================================================
-  // HOLE TABLE, NOTES, MASS PROPERTIES & TITLE BLOCK
-  // =========================================================================
+  // Mass Properties Box
   const f2 = v => v.toFixed(2);
-  T(160, 245, 'MASS PROPERTIES (' + (P.material||'AL 7075-T6').split(' ')[0] + ')', 2.8, 'l', 0, 0, 1);
+  const mBoxX = 160 * (sheetW/420), mBoxY = sheetH - 52;
+  T(mBoxX, mBoxY, 'MASS PROPERTIES (' + (P.material||'AL').split(' ')[0] + ')', 2.8, 'l', 0, 0, 1);
   [
     ['Solid blank size', f2(blank_mass) + ' kg'],
     ['Finished part mass', f2(fin_mass) + ' kg'],
     ['Mass reduction', mass_red.toFixed(1) + ' %']
   ].forEach((r,i)=>{
-    const y = 248 + i*5.5;
-    L(160, y, 225, y, 0.15);
-    T(161, y + 4, r[0], 2.3, 'l', 0, 0, i>0);
-    T(224, y + 4, r[1], 2.3, 'r', 0, 0, i>0);
+    const y = mBoxY + 3 + i*5.5;
+    L(mBoxX, y, mBoxX + 65, y, 0.15);
+    T(mBoxX + 1, y + 4, r[0], 2.3, 'l', 0, 0, i>0);
+    T(mBoxX + 64, y + 4, r[1], 2.3, 'r', 0, 0, i>0);
   });
-  L(160, 265, 225, 265, 0.15);
+  L(mBoxX, mBoxY + 19.5, mBoxX + 65, mBoxY + 19.5, 0.15);
 
+  // Notes
   const wrap=(t,n)=>{const w=[];let l='';t.split(' ').forEach(x=>{if((l+' '+x).length>n){w.push(l);l=x}else l=(l?l+' ':'')+x});w.push(l);return w};
-  T(15, 213, 'NOTES:', 3.2, 'l', 0, 0, 1);
-  let ny = 217.5;
-  (P.notes||[]).forEach((t,i)=>wrap((i+1)+'. '+t.replace(/EVALUATED FINISHED MASS:.*kg/i,'EVALUATED FINISHED MASS: '+f2(fin_mass)+' kg'), 105).forEach(l=>{
-    if(ny < 243){ T(15, ny, l, 2.4, 'l'); ny += 3.4; }
+  T(15, sheetH - 84, 'NOTES:', 3.2, 'l', 0, 0, 1);
+  let ny = sheetH - 79.5;
+  (P.notes||[]).forEach((t,i)=>wrap((i+1)+'. '+t.replace(/EVALUATED FINISHED MASS:.*kg/i,'EVALUATED FINISHED MASS: '+f2(fin_mass)+' kg'), 95).forEach(l=>{
+    if(ny < sheetH - 54){ T(15, ny, l, 2.4, 'l'); ny += 3.4; }
   }));
 
-  T(15, 246, 'HOLE TABLE (' + (isPrismatic ? 'DATUM X0, Y0 AT BOTTOM-LEFT' : '0° = +X, CCW, FROM TOP') + ')', 2.8, 'l', 0, 0, 1);
-  const cx2 = [15, 25, 35, 97, 111, 155], ty = 248, rh = 9;
-  Rc(15, ty, 140, 6 + rh*H.length);
-  L(15, ty+6, 155, ty+6, 0.2);
+  // Hole Table
+  const hTableY = sheetH - 49;
+  T(15, hTableY - 2, 'HOLE TABLE (' + (isPrismatic ? 'DATUM X0, Y0 AT BOTTOM-LEFT' : '0° = +X, CCW, FROM TOP') + ')', 2.8, 'l', 0, 0, 1);
+  const cx2 = [15, 25, 35, 97, 111, 155].map(v => v * (sheetW/420)), ty = hTableY, rh = 9;
+  Rc(15, ty, 140 * (sheetW/420), 6 + rh*H.length);
+  L(15, ty+6, 155 * (sheetW/420), ty+6, 0.2);
   for(let c=1; c<5; c++) L(cx2[c], ty, cx2[c], ty+6+rh*H.length, 0.2);
   ['TAG','QTY','DESCRIPTION', isPrismatic?'PITCH / COORDS':'PCD', isPrismatic?'LOCATIONS':'ANGULAR POSITION'].forEach((t,c)=>T(cx2[c]+1.2, ty+4, t, 2.2, 'l', 0, 0, 1));
   H.forEach((h,i)=>{
     const y = ty + 6 + rh*i, q = h.coords?.length || +h.qty || 1, ls = (h.desc||'').split('|');
-    if(i) L(15, y, 155, y, 0.2);
-    T(16.2, y + 5.2, h.tag, 2.4, 'l', 0, 0, 1);
-    T(26.2, y + 5.2, q, 2.4, 'l');
-    ls.slice(0, 2).forEach((t,j)=>T(36.2, y + 3.8 + j*3.3, t, 2.2, 'l'));
-    T(98.2, y + 5.2, h.pcd ? ('Ø'+h.pcd) : (h.coords ? 'GRID' : '-'), 2.4, 'l');
+    if(i) L(15, y, 155 * (sheetW/420), y, 0.2);
+    T(cx2[0] + 1.2, y + 5.2, h.tag, 2.4, 'l', 0, 0, 1);
+    T(cx2[1] + 1.2, y + 5.2, q, 2.4, 'l');
+    ls.slice(0, 2).forEach((t,j)=>T(cx2[2] + 1.2, y + 3.8 + j*3.3, t, 2.2, 'l'));
+    T(cx2[3] + 1.2, y + 5.2, h.pcd ? ('Ø'+h.pcd) : (h.coords ? 'GRID' : '-'), 2.4, 'l');
     const posStr = h.angles ? h.angles.join('°, ')+'°' : (h.coords ? (q+'X MATRIX') : ((h.start||0)+'° START'));
-    T(112.2, y + 5.2, posStr, 2.2, 'l');
+    T(cx2[4] + 1.2, y + 5.2, posStr, 2.2, 'l');
   });
 
-  const X=230, Y=240, W2=180, cell=(x,y,w,h,lb,v,z=3.4)=>{Rc(x,y,w,h,.3);T(x+1.2,y+2.8,lb,1.8,'l');T(x+1.2,y+h-2.2,String(v),z,'l')};
-  Rc(X,Y,W2,47,0.7); Rc(X,Y,W2,17,0.3);
+  // Title Block
+  const W2 = 180, H2 = 47;
+  const X = sheetW - 10 - W2, Y = sheetH - 10 - H2;
+  const cell=(x,y,w,h,lb,v,z=3.4)=>{Rc(x,y,w,h,.3);T(x+1.2,y+2.8,lb,1.8,'l');T(x+1.2,y+h-2.2,String(v),z,'l')};
+  Rc(X,Y,W2,H2,0.7); Rc(X,Y,W2,17,0.3);
   T(X+1.2, Y+2.8, 'TITLE', 1.8, 'l');
   T(X+W2/2, Y+8, P.title||'', 6.2, 'm', 0, 0, 1);
   T(X+W2/2, Y+13.8, P.subtitle||'', 2.8, 'm');
@@ -624,11 +729,11 @@ function build(P){
   cell(X, Y+27, 90, 10, 'MATERIAL', P.material||'', 3);
   cell(X+90, Y+27, 45, 10, 'MASS (CALC.)', f2(fin_mass)+' kg', 2.8);
   cell(X+135, Y+27, 45, 10, 'SCALE', sc(topScale));
-  cell(X, Y+37, 45, 10, 'SIZE', 'A3');
+  cell(X, Y+37, 45, 10, 'SIZE', userSize);
   cell(X+45, Y+37, 90, 10, 'DRAWN / DATE', (P.drawn||'')+' / '+(P.date||''));
   cell(X+135, Y+37, 45, 10, 'PROJECTION', '1st (ISO)', 3);
 
-  // 3D Isometric View (Three.js with rock-solid scope)
+  // 3D Isometric View
   function iso3d(){
     try {
       const T3 = window.THREE;
@@ -650,7 +755,6 @@ function build(P){
       if(!isPrismatic){
         const fl = pk ? (+pk.floor || thk - pk.depth) : thk;
         const circ = (r,x=0,y=0) => polar(r,0,360,64).map(([a,b])=>new T3.Vector2(a+x, b+y));
-        
         const baseSh = new T3.Shape(circ(od/2));
         if(bore) baseSh.holes.push(new T3.Path(circ(bore/2)));
         hp.forEach(p => baseSh.holes.push(new T3.Path(circ(p.h.dia/2, p.x, p.y))));
@@ -676,27 +780,21 @@ function build(P){
         const L_p = +P.length || 240, W_p = +P.width || 180;
         const pks = P.pockets || [];
         const baseSh = new T3.Shape([
-          new T3.Vector2(-L_p/2, -W_p/2),
-          new T3.Vector2(L_p/2, -W_p/2),
-          new T3.Vector2(L_p/2, W_p/2),
-          new T3.Vector2(-L_p/2, W_p/2)
+          new T3.Vector2(-L_p/2, -W_p/2), new T3.Vector2(L_p/2, -W_p/2),
+          new T3.Vector2(L_p/2, W_p/2), new T3.Vector2(-L_p/2, W_p/2)
         ]);
         if(pks.length > 0){
           const fl = pks[0].floor || (thk - pks[0].depth);
           addExt(baseSh, 0, fl);
           const topSh = new T3.Shape([
-            new T3.Vector2(-L_p/2, -W_p/2),
-            new T3.Vector2(L_p/2, -W_p/2),
-            new T3.Vector2(L_p/2, W_p/2),
-            new T3.Vector2(-L_p/2, W_p/2)
+            new T3.Vector2(-L_p/2, -W_p/2), new T3.Vector2(L_p/2, -W_p/2),
+            new T3.Vector2(L_p/2, W_p/2), new T3.Vector2(-L_p/2, W_p/2)
           ]);
           pks.forEach(pk => {
             const px = pk.x - L_p/2, py = pk.y - W_p/2;
             topSh.holes.push(new T3.Path([
-              new T3.Vector2(px, py),
-              new T3.Vector2(px + pk.w, py),
-              new T3.Vector2(px + pk.w, py + pk.h),
-              new T3.Vector2(px, py + pk.h)
+              new T3.Vector2(px, py), new T3.Vector2(px + pk.w, py),
+              new T3.Vector2(px + pk.w, py + pk.h), new T3.Vector2(px, py + pk.h)
             ]));
           });
           addExt(topSh, fl, thk - fl);
@@ -705,9 +803,14 @@ function build(P){
         }
       }
 
-      const cam = new T3.OrthographicCamera(-160, 160, 120, -120, 1, 3000);
+      const maxDiam = Math.max(od, (P.lugs?.reachRadius||od/2)*2, isPrismatic ? Math.max(P.length||240, P.width||180) : od);
+      const totalEnvelope = Math.max(maxDiam, thk * 2.2);
+      const isoMultiplier = scales.iso === 'AUTO' ? 1.0 : (+scales.iso || 1.0);
+      const wCam = (totalEnvelope * 0.62) / isoMultiplier;
+
+      const cam = new T3.OrthographicCamera(-wCam, wCam, wCam*700/900, -wCam*700/900, 1, totalEnvelope * 12);
       cam.up.set(0, 0, 1);
-      cam.position.set(200, -250, 220);
+      cam.position.set(1.4, -1.8, 1.5).multiplyScalar(totalEnvelope * 1.5);
       cam.lookAt(0, 0, thk/2);
       scene.add(new T3.AmbientLight(0xffffff, 0.7));
       const dl = new T3.DirectionalLight(0xffffff, 0.8);
@@ -718,16 +821,18 @@ function build(P){
     } catch(e) { return null; }
   }
 
+  const isoX = sheetW - 10 - 130, isoY = 10;
   const img = iso3d();
-  if(img) o.push({t:'i', p:[280, 10, 100, 72], u:img});
-  T(330, 88, 'ISOMETRIC VIEW (NOT TO SCALE)', 3.2, 'm', 0, 0, 1);
+  if(img) o.push({t:'i', p:[isoX, isoY, 115, 74], u:img});
+  T(isoX + 57.5, isoY + 79, 'ISOMETRIC VIEW (NOT TO SCALE)', 3.2, 'm', 0, 0, 1);
 
-  return S;
+  return { S, sheetW, sheetH };
 }
 
-function svg(o){
+function svg(res){
+  const o = res.S[0], sheetW = res.sheetW, sheetH = res.sheetH;
   const f = n => +n.toFixed(2);
-  let s = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 420 297"><rect width="420" height="297" fill="#fff"/><g stroke-linejoin="round">';
+  let s = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${sheetW} ${sheetH}"><rect width="${sheetW}" height="${sheetH}" fill="#fff"/><g stroke-linejoin="round">`;
   o.forEach(e=>{
     if(e.t=='p') s+=`<${e.z?'polygon':'polyline'} points="${e.p.map(q=>f(q[0])+','+f(q[1])).join(' ')}" fill="${e.f||'none'}" stroke="${e.c||'#111111'}" stroke-width="${e.w}"${e.s?` stroke-dasharray="${e.s} ${e.s/2}"`:''}/>`;
     else if(e.t=='i') s+=`<image href="${e.u}" x="${e.p[0]}" y="${e.p[1]}" width="${e.p[2]}" height="${e.p[3]}"/>`;
@@ -736,11 +841,11 @@ function svg(o){
   return s+'</g></svg>';
 }
 
-function pdf(S){
-  const d = new window.jspdf.jsPDF({orientation:'landscape', unit:'mm', format:'a3'});
+function pdf(res, sizeStr='a3'){
+  const d = new window.jspdf.jsPDF({orientation:'landscape', unit:'mm', format: sizeStr.toLowerCase()});
   const hx = c => [1,3,5].map(i=>parseInt(c.slice(i,i+2),16));
-  S.forEach((o,si)=>{
-    if(si) d.addPage('a3','landscape');
+  res.S.forEach((o,si)=>{
+    if(si) d.addPage(sizeStr.toLowerCase(), 'landscape');
     o.forEach(e=>{
       if(e.t=='i') d.addImage(e.u, 'PNG', e.p[0], e.p[1], e.p[2], e.p[3]);
       else if(e.t=='p'){
@@ -761,36 +866,76 @@ function pdf(S){
   return d;
 }
 
-let ops = null;
+let curRes = null;
 function render(){
   $('err').style.color='';
   try {
     const P = JSON.parse($('json').value);
-    ops = build(P);
-    $('prev').innerHTML = ops.map(svg).join('<div style="height:12px"></div>');
-    $('err').textContent = 'Drawing rendered successfully.';
+    const sz = $('sheet_size').value;
+    const scales = {
+      top: $('scale_top').value,
+      secA: $('scale_sec_a').value,
+      secB: $('scale_sec_b').value,
+      iso: $('scale_iso').value
+    };
+    curRes = build(P, sz, scales);
+    $('prev').innerHTML = svg(curRes);
+    $('err').textContent = 'Sheet successfully updated (' + (P.partNumber||'Part') + ' on ' + sz + ').';
     $('err').style.color = 'var(--ac)';
   } catch(e) {
-    ops = null;
+    curRes = null;
     $('err').textContent = 'Error: ' + e.message;
     $('err').style.color = '#c0392b';
   }
 }
 
-$('json').value = JSON.stringify(DEF_CIRC, null, 2);
-render();
+$('part_select').onchange = ()=>{
+  const sel = $('part_select').value;
+  if(PRESETS[sel]){
+    $('json').value = JSON.stringify(PRESETS[sel], null, 2);
+    render();
+  }
+};
 
-$('upd').onclick = render;
-$('load_p06').onclick = ()=>{ $('json').value = JSON.stringify(DEF_CIRC, null, 2); render(); };
-$('load_rect').onclick = ()=>{ $('json').value = JSON.stringify(DEF_RECT, null, 2); render(); };
-$('dl').onclick = ()=>{
-  if(!ops) return render();
+$('btn_save_preset').onclick = ()=>{
   try {
     const P = JSON.parse($('json').value);
-    pdf(ops).save((P.partNumber||'drawing') + '.pdf');
+    const customName = ($('custom_part_name').value.trim()) || (P.partNumber || P.title || 'Custom Part');
+    const key = 'PRESET_' + Date.now();
+    PRESETS[key] = P;
+    const opt = document.createElement('option');
+    opt.value = key;
+    opt.textContent = customName;
+    opt.selected = true;
+    $('part_select').appendChild(opt);
+    $('err').textContent = 'Saved "' + customName + '" to presets menu!';
+    $('err').style.color = 'var(--ac)';
+  } catch(e) {
+    $('err').textContent = 'Could not save preset: ' + e.message;
+    $('err').style.color = '#c0392b';
+  }
+};
+
+$('sheet_size').onchange = render;
+$('scale_top').onchange = render;
+$('scale_sec_a').onchange = render;
+$('scale_sec_b').onchange = render;
+$('scale_iso').onchange = render;
+$('upd').onclick = render;
+
+$('dl').onclick = ()=>{
+  if(!curRes) return render();
+  try {
+    const P = JSON.parse($('json').value);
+    const sz = $('sheet_size').value;
+    pdf(curRes, sz).save((P.partNumber||'drawing') + '_' + sz + '.pdf');
   } catch(e) {
     $('err').textContent = 'Download failed: ' + e.message;
   }
 };
+
+$('part_select').value = 'PISTON';
+$('json').value = JSON.stringify(PRESETS.PISTON, null, 2);
+render();
 </script>
 </body></html>
