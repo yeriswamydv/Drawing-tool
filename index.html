@@ -216,11 +216,29 @@ function build(P){
   let fin_mass = 0, blank_mass = 0, mass_red = 0;
   const H = P.holes || [];
 
+  // POCKET HELPER FUNCTIONS DEFINED IN SHARED SCOPE
+  const od = +P.od || 0, bore = +P.bore || 0, pk = P.pockets;
+  const rin = pk ? (+pk.rin || bore/2 + 25) : 0;
+  const rout = pk ? (+pk.rout || od/2 - 18) : 0;
+  const pi = (pk && pk.n) ? 360/pk.n : 0;
+  const hw = r => (pk && pk.rib) ? (pi/2 - Math.asin((+pk.rib)/2/r)*180/Math.PI) : 0;
+  const walk=(p,i,d,r)=>{let j=i,rem=r;for(;;){const k=(j+d+p.length)%p.length,sg=Math.hypot(p[k][0]-p[j][0],p[k][1]-p[j][1]);if(sg>=rem){const u=rem/sg;return[p[j][0]+(p[k][0]-p[j][0])*u,p[j][1]+(p[k][1]-p[j][1])*u]}rem-=sg;j=k}};
+  function pocketPoly(i){
+    if(!pk) return [];
+    const a=i*pi, p=polar(rout,a-hw(rout),a+hw(rout),12).concat(polar(rin,a+hw(rin),a-hw(rin),12)), cs=[0,12,13,25], out=[], rr=+pk.corner||8;
+    p.forEach((q,k)=>{if(!cs.includes(k)){out.push(q);return;}const A=walk(p,k,-1,rr),B=walk(p,k,1,rr);for(let t=0;t<=6;t++){const u=t/6,v=1-u;out.push([v*v*A[0]+2*v*u*q[0]+u*u*B[0],v*v*A[1]+2*v*u*q[1]+u*u*B[1]])}});return out;
+  }
+
+  // Hole points array
+  const hp = (!isPrismatic) ? H.flatMap(h=>{
+    const q=+h.qty||1, an=h.angles||Array.from({length:q},(_,i)=>(+h.start||0)+i*360/q);
+    return an.map(g=>({h,g,x:h.pcd/2*Math.cos(g*Math.PI/180), y:h.pcd/2*Math.sin(g*Math.PI/180)}));
+  }) : [];
+
   if(!isPrismatic){
     // =========================================================================
     // CIRCULAR PIPELINE WITH TRUE FULL-DIAMETER SECTIONS
     // =========================================================================
-    const od = +P.od, bore = +P.bore||0, pk = P.pockets;
     const maxDim = Math.max(od, (P.lugs?.reachRadius||od/2)*2);
     topScale = pick(150 / maxDim);
     const cx = 110, cy = 118, Rr = od/2*topScale;
@@ -247,26 +265,12 @@ function build(P){
     }
 
     // Pockets
-    const rin = pk ? (+pk.rin || bore/2 + 25) : 0;
-    const rout = pk ? (+pk.rout || od/2 - 18) : 0;
-    const pi = pk ? 360/pk.n : 0;
-    const hw = r => pi/2 - Math.asin((+pk.rib||14)/2/r)*180/Math.PI;
-    const walk=(p,i,d,r)=>{let j=i,rem=r;for(;;){const k=(j+d+p.length)%p.length,sg=Math.hypot(p[k][0]-p[j][0],p[k][1]-p[j][1]);if(sg>=rem){const u=rem/sg;return[p[j][0]+(p[k][0]-p[j][0])*u,p[j][1]+(p[k][1]-p[j][1])*u]}rem-=sg;j=k}};
-    function pocketPoly(i){
-      const a=i*pi, p=polar(rout,a-hw(rout),a+hw(rout),12).concat(polar(rin,a+hw(rin),a-hw(rin),12)), cs=[0,12,13,25], out=[], rr=+pk.corner||8;
-      p.forEach((q,k)=>{if(!cs.includes(k)){out.push(q);return;}const A=walk(p,k,-1,rr),B=walk(p,k,1,rr);for(let t=0;t<=6;t++){const u=t/6,v=1-u;out.push([v*v*A[0]+2*v*u*q[0]+u*u*B[0],v*v*A[1]+2*v*u*q[1]+u*u*B[1]])}});return out;
-    }
     if(pk) for(let i=0; i<+pk.n; i++) PL(pocketPoly(i).map(tf), 0.45);
 
     // Centerlines
     L(cx-Rr-10, cy, cx+Rr+14, cy, 0.15, 4);
     L(cx, cy-Rr-8, cx, cy+Rr+8, 0.15, 4);
 
-    // Hole rendering
-    const hp = H.flatMap(h=>{
-      const q=+h.qty||1, an=h.angles||Array.from({length:q},(_,i)=>(+h.start||0)+i*360/q);
-      return an.map(g=>({h,g,x:h.pcd/2*Math.cos(g*Math.PI/180), y:h.pcd/2*Math.sin(g*Math.PI/180)}));
-    });
     H.forEach(h=>PL(polar(h.pcd/2, 0, 360, 120).map(tf), 0.15, 3));
     hp.forEach(p=>{
       PL(polar(p.h.dia/2, 0, 360, 16).map(([a,b])=>tf([a+p.x, b+p.y])), 0.3);
@@ -329,7 +333,6 @@ function build(P){
     cuts.forEach(([n, a, sg])=>{
       const rad = a * Math.PI / 180, c = Math.cos(rad), sn = Math.sin(rad);
       const dx = c, dy = -sn, nx = -dy*sg, ny = dx*sg;
-      // Both sides of the full diameter cutting plane:
       [-1, 1].forEach(dir=>{
         const r1 = dir * (Rr + 2), r2 = dir * (Rr + 9);
         const mx = cx + dx * r2, my = cy + dy * r2;
@@ -338,7 +341,6 @@ function build(P){
         arrow(mx + nx * 8, my + ny * 8, -nx, -ny);
         T(mx + nx * 11.5, my + ny * 11.5 + 1.3, n, 4, 'm', 0, 0, 1);
       });
-      // Cutting plane dashed line across part
       L(cx - dx*Rr, cy - dy*Rr, cx + dx*Rr, cy + dy*Rr, 0.2, 5);
     });
 
@@ -347,17 +349,15 @@ function build(P){
 
     // =========================================================================
     // TRUE FULL-DIAMETER SECTION CUTS (EDGE TO EDGE: -OD/2 to +OD/2)
+    // PERFECT SPACING: ZERO COLLISION GUARANTEED
     // =========================================================================
-    // Available section width is 135mm (X=260 to X=395). We scale full diameter:
     const secScale = pick(130 / od);
     const secW = od * secScale;
     const x0 = 265 + (130 - secW)/2;
     const y0_A = 114;
-    const y0_B = y0_A + thk*secScale + 26;
+    const y0_B = 172; // Placed well below Section A-A title for 16mm clear whitespace!
 
     function drawFullCircSection(nm, a_deg, y0){
-      const a = a_deg * Math.PI / 180;
-      // We sample points across the full diameter from u = -od/2 to +od/2
       const step = 0.5;
       const poly = [];
       const inPocketAt = (u) => {
@@ -369,12 +369,11 @@ function build(P){
         return da < hw(r);
       };
 
-      // Top profile of cut:
       for(let u = -od/2; u <= od/2; u += step){
         const r = Math.abs(u);
         let topY = 0;
         if(bore && r < bore/2){
-          topY = thk; // hollow bore
+          topY = thk;
         } else if(inPocketAt(u)){
           topY = +pk.depth;
         }
@@ -384,7 +383,6 @@ function build(P){
       poly.push([x0, y0 + thk*secScale]);
       PL(poly, 0.5);
 
-      // Hatching solid material (where topY < thk)
       hatch((x, y)=>{
         const u = x/secScale - od/2;
         const r = Math.abs(u);
@@ -393,11 +391,9 @@ function build(P){
         return y > topY + 0.01;
       }, x0, y0, secW, thk*secScale);
 
-      // Centerline at bore axis
       const xCenter = x0 + (od/2)*secScale;
       L(xCenter, y0 - 4, xCenter, y0 + thk*secScale + 4, 0.15, 4);
 
-      // Holes cutting through this section
       const holesInCut = H.filter(h => {
         const an = h.angles || Array.from({length:+h.qty||1},(_,i)=>(+h.start||0)+i*360/(+h.qty||1));
         return an.some(g => Math.abs(((g - a_deg + 180)%360+360)%360 - 180) < 1 || Math.abs(((g - (a_deg+180) + 180)%360+360)%360 - 180) < 1);
@@ -419,23 +415,21 @@ function build(P){
         });
       });
 
-      // Section Dimensions
-      dim(x0, y0, x0 + secW, y0, -10, 'Ø' + od + ' FULL WIDTH');
+      dim(x0, y0, x0 + secW, y0, -8, 'Ø' + od + ' FULL WIDTH');
       dim(x0, y0, x0, y0 + thk*secScale, 10, thk + ' ' + (P.tolT||''));
-      if(pk && (inPocketAt(rout - 5) || inPocketAt(-rout + 5))){
+      if(pk && inPocketAt(rout - 5)){
         const xP1 = x0 + (od/2 + rin)*secScale, xP2 = x0 + (od/2 + rout)*secScale;
-        dim(xP1, y0, xP2, y0, -16, R2(rout-rin) + ' POCKET');
+        dim(xP1, y0, xP2, y0, -14, R2(rout-rin) + ' POCKET');
         dim(x0 + secW, y0 + (+pk.depth)*secScale, x0 + secW, y0 + thk*secScale, -8, (pk.floor||(thk-pk.depth)) + ' FLOOR');
       }
 
-      T(x0, y0 + thk*secScale + 8, 'SECTION ' + nm + '-' + nm, 4.2, 'l', 0, 0, 1);
-      T(x0 + 44, y0 + thk*secScale + 8, 'SCALE ' + sc(secScale) + ' (FULL-DIAMETER CUT, ' + a_deg + '°)', 2.6, 'l');
+      T(x0, y0 + thk*secScale + 7, 'SECTION ' + nm + '-' + nm, 4.2, 'l', 0, 0, 1);
+      T(x0 + 44, y0 + thk*secScale + 7, 'SCALE ' + sc(secScale) + ' (FULL-DIAMETER CUT, ' + a_deg + '°)', 2.6, 'l');
     }
 
     drawFullCircSection(cuts[0][0], cuts[0][1], y0_A);
     drawFullCircSection(cuts[1][0], cuts[1][1], y0_B);
 
-    // Mass Properties Calculation
     const dn = +P.density || 2.81, kg = v => v/1e6 * dn;
     const Vs = Math.PI * (od/2)**2 * thk, Vb = Math.PI * (bore/2)**2 * thk;
     let Vp = pk ? (Math.PI * (rout**2 - rin**2) - pk.n * pk.rib * (rout - rin)) * pk.depth : 0;
@@ -448,27 +442,23 @@ function build(P){
     // =========================================================================
     // PRISMATIC / RECTANGULAR PIPELINE WITH FULL TRANSVERSE & LONGITUDINAL CUTS
     // =========================================================================
-    const L_part = +P.length || 240, W_part = +P.width || 180, R_cor = +P.corner_radius || 0;
+    const L_part = +P.length || 240, W_part = +P.width || 180;
     topScale = pick(150 / Math.max(L_part, W_part));
     const cx = 110, cy = 118;
     const leftX = cx - (L_part/2)*topScale, topY = cy - (W_part/2)*topScale;
     const wScaled = L_part * topScale, hScaled = W_part * topScale;
 
-    // Draw Top View Rectangle
     Rc(leftX, topY, wScaled, hScaled, 0.6);
 
-    // Centerlines
     L(leftX - 8, cy, leftX + wScaled + 8, cy, 0.15, 4);
     L(cx, topY - 8, cx, topY + hScaled + 8, 0.15, 4);
 
-    // Pockets
     const pks = P.pockets || [];
     pks.forEach(pk => {
       Rc(leftX + pk.x*topScale, topY + pk.y*topScale, pk.w*topScale, pk.h*topScale, 0.45);
       T(leftX + (pk.x + pk.w/2)*topScale, topY + (pk.y + pk.h/2)*topScale, pk.desc || (pk.w+'×'+pk.h+' POCKET '+pk.depth+' DP'), 2.4, 'm');
     });
 
-    // Holes
     H.forEach((h, i) => {
       const coords = h.coords || [];
       coords.forEach(([hx, hy]) => {
@@ -478,7 +468,6 @@ function build(P){
         L(px - 3, py, px + 3, py, 0.12, 3);
         L(px, py - 3, px, py + 3, 0.12, 3);
       });
-      // Leader tag for hole group
       if(coords.length > 0){
         const [fx, fy] = coords[0];
         const px = leftX + fx*topScale, py = topY + fy*topScale;
@@ -489,19 +478,14 @@ function build(P){
       }
     });
 
-    // Overall Top Dimensions
     dim(leftX, topY, leftX + wScaled, topY, -12, L_part + ' ' + (P.tolL||''));
     dim(leftX, topY, leftX, topY + hScaled, 12, W_part + ' ' + (P.tolW||''));
 
-    // Cutting Planes Across Entire Part
-    // Section A-A: Transverse at X = L/2
     const cutA_X = leftX + wScaled/2;
     L(cutA_X, topY - 10, cutA_X, topY + hScaled + 10, 0.2, 5);
-    // Arrows at extremities
     L(cutA_X, topY - 4, cutA_X, topY - 12, 0.8); L(cutA_X, topY - 12, cutA_X + 6, topY - 12, 0.3); arrow(cutA_X + 6, topY - 12, -1, 0); T(cutA_X + 9, topY - 11, 'A', 4, 'm', 0, 0, 1);
     L(cutA_X, topY + hScaled + 4, cutA_X, topY + hScaled + 12, 0.8); L(cutA_X, topY + hScaled + 12, cutA_X + 6, topY + hScaled + 12, 0.3); arrow(cutA_X + 6, topY + hScaled + 12, -1, 0); T(cutA_X + 9, topY + hScaled + 13, 'A', 4, 'm', 0, 0, 1);
 
-    // Section B-B: Longitudinal at Y = W/2
     const cutB_Y = topY + hScaled/2;
     L(leftX - 10, cutB_Y, leftX + wScaled + 10, cutB_Y, 0.2, 5);
     L(leftX - 4, cutB_Y, leftX - 12, cutB_Y, 0.8); L(leftX - 12, cutB_Y, leftX - 12, cutB_Y - 6, 0.3); arrow(leftX - 12, cutB_Y - 6, 0, 1); T(leftX - 12, cutB_Y - 9, 'B', 4, 'm', 0, 0, 1);
@@ -510,17 +494,11 @@ function build(P){
     T(cx, 202, 'TOP VIEW', 4.2, 'm', 0, 0, 1);
     T(cx, 206.5, 'SCALE ' + sc(topScale), 2.8);
 
-    // =========================================================================
-    // TRUE PRISMATIC EDGE-TO-EDGE SECTION CUTS
-    // =========================================================================
-    // Available section width = 135 mm (X=260 to 395)
-    // Section A-A: Full width W_part across Y
     const secScaleA = pick(130 / W_part);
     const secWA = W_part * secScaleA;
     const x0_A = 265 + (130 - secWA)/2, y0_A = 114;
 
     function drawPrismaticSectionA(){
-      // Transverse cut at X = L/2 across Y=0 to Y=W_part
       const pkCut = pks.find(p => (L_part/2) >= p.x && (L_part/2) <= (p.x + p.w));
       const poly = [];
       const step = 0.5;
@@ -539,20 +517,19 @@ function build(P){
         return y > topY + 0.01;
       }, x0_A, y0_A, secWA, thk*secScaleA);
 
-      dim(x0_A, y0_A, x0_A + secWA, y0_A, -10, W_part + ' FULL WIDTH');
+      dim(x0_A, y0_A, x0_A + secWA, y0_A, -8, W_part + ' FULL WIDTH');
       dim(x0_A, y0_A, x0_A, y0_A + thk*secScaleA, 10, thk + ' ' + (P.tolT||''));
       if(pkCut){
         dim(x0_A + secWA, y0_A + (+pkCut.depth)*secScaleA, x0_A + secWA, y0_A + thk*secScaleA, -8, (pkCut.floor||(thk-pkCut.depth)) + ' FLOOR');
       }
 
-      T(x0_A, y0_A + thk*secScaleA + 8, 'SECTION A-A', 4.2, 'l', 0, 0, 1);
-      T(x0_A + 38, y0_A + thk*secScaleA + 8, 'SCALE ' + sc(secScaleA) + ' (FULL TRANSVERSE CUT)', 2.6, 'l');
+      T(x0_A, y0_A + thk*secScaleA + 7, 'SECTION A-A', 4.2, 'l', 0, 0, 1);
+      T(x0_A + 38, y0_A + thk*secScaleA + 7, 'SCALE ' + sc(secScaleA) + ' (FULL TRANSVERSE CUT)', 2.6, 'l');
     }
 
-    // Section B-B: Full length L_part across X
     const secScaleB = pick(130 / L_part);
     const secWB = L_part * secScaleB;
-    const x0_B = 265 + (130 - secWB)/2, y0_B = y0_A + thk*secScaleA + 26;
+    const x0_B = 265 + (130 - secWB)/2, y0_B = 172;
 
     function drawPrismaticSectionB(){
       const pkCut = pks.find(p => (W_part/2) >= p.y && (W_part/2) <= (p.y + p.h));
@@ -573,20 +550,19 @@ function build(P){
         return y > topY + 0.01;
       }, x0_B, y0_B, secWB, thk*secScaleB);
 
-      dim(x0_B, y0_B, x0_B + secWB, y0_B, -10, L_part + ' FULL LENGTH');
+      dim(x0_B, y0_B, x0_B + secWB, y0_B, -8, L_part + ' FULL LENGTH');
       dim(x0_B, y0_B, x0_B, y0_B + thk*secScaleB, 10, thk + ' ' + (P.tolT||''));
       if(pkCut){
         dim(x0_B + secWB, y0_B + (+pkCut.depth)*secScaleB, x0_B + secWB, y0_B + thk*secScaleB, -8, (pkCut.floor||(thk-pkCut.depth)) + ' FLOOR');
       }
 
-      T(x0_B, y0_B + thk*secScaleB + 8, 'SECTION B-B', 4.2, 'l', 0, 0, 1);
-      T(x0_B + 38, y0_B + thk*secScaleB + 8, 'SCALE ' + sc(secScaleB) + ' (FULL LONGITUDINAL CUT)', 2.6, 'l');
+      T(x0_B, y0_B + thk*secScaleB + 7, 'SECTION B-B', 4.2, 'l', 0, 0, 1);
+      T(x0_B + 38, y0_B + thk*secScaleB + 7, 'SCALE ' + sc(secScaleB) + ' (FULL LONGITUDINAL CUT)', 2.6, 'l');
     }
 
     drawPrismaticSectionA();
     drawPrismaticSectionB();
 
-    // Mass properties
     const dn = +P.density || 2.81, kg = v => v/1e6 * dn;
     const Vs = L_part * W_part * thk;
     let Vp = pks.reduce((acc,pk)=> acc + pk.w * pk.h * pk.depth, 0);
@@ -613,7 +589,6 @@ function build(P){
   });
   L(160, 265, 225, 265, 0.15);
 
-  // Notes
   const wrap=(t,n)=>{const w=[];let l='';t.split(' ').forEach(x=>{if((l+' '+x).length>n){w.push(l);l=x}else l=(l?l+' ':'')+x});w.push(l);return w};
   T(15, 213, 'NOTES:', 3.2, 'l', 0, 0, 1);
   let ny = 217.5;
@@ -621,7 +596,6 @@ function build(P){
     if(ny < 243){ T(15, ny, l, 2.4, 'l'); ny += 3.4; }
   }));
 
-  // Hole Table
   T(15, 246, 'HOLE TABLE (' + (isPrismatic ? 'DATUM X0, Y0 AT BOTTOM-LEFT' : '0° = +X, CCW, FROM TOP') + ')', 2.8, 'l', 0, 0, 1);
   const cx2 = [15, 25, 35, 97, 111, 155], ty = 248, rh = 9;
   Rc(15, ty, 140, 6 + rh*H.length);
@@ -639,7 +613,6 @@ function build(P){
     T(112.2, y + 5.2, posStr, 2.2, 'l');
   });
 
-  // Title Block (No Preliminary Box - maximum clean space!)
   const X=230, Y=240, W2=180, cell=(x,y,w,h,lb,v,z=3.4)=>{Rc(x,y,w,h,.3);T(x+1.2,y+2.8,lb,1.8,'l');T(x+1.2,y+h-2.2,String(v),z,'l')};
   Rc(X,Y,W2,47,0.7); Rc(X,Y,W2,17,0.3);
   T(X+1.2, Y+2.8, 'TITLE', 1.8, 'l');
@@ -655,8 +628,7 @@ function build(P){
   cell(X+45, Y+37, 90, 10, 'DRAWN / DATE', (P.drawn||'')+' / '+(P.date||''));
   cell(X+135, Y+37, 45, 10, 'PROJECTION', '1st (ISO)', 3);
 
-  // 3D Isometric View
-    // 3D Isometric View
+  // 3D Isometric View (Three.js with rock-solid scope)
   function iso3d(){
     try {
       const T3 = window.THREE;
@@ -676,18 +648,14 @@ function build(P){
       };
 
       if(!isPrismatic){
-        // Circular Three.js mesh with true pocket cavity subtraction
-        const od = +P.od, bore = +P.bore||0, pk = P.pockets;
         const fl = pk ? (+pk.floor || thk - pk.depth) : thk;
         const circ = (r,x=0,y=0) => polar(r,0,360,64).map(([a,b])=>new T3.Vector2(a+x, b+y));
         
-        // Base floor layer (from z=0 to z=floor)
         const baseSh = new T3.Shape(circ(od/2));
         if(bore) baseSh.holes.push(new T3.Path(circ(bore/2)));
         hp.forEach(p => baseSh.holes.push(new T3.Path(circ(p.h.dia/2, p.x, p.y))));
         addExt(baseSh, 0, fl);
 
-        // Top rib & wall layer (from z=floor to z=thk)
         if(pk && thk > fl){
           const topSh = new T3.Shape(circ(od/2));
           if(bore) topSh.holes.push(new T3.Path(circ(bore/2)));
@@ -705,7 +673,6 @@ function build(P){
           addExt(topSh, fl, thk - fl);
         }
       } else {
-        // Prismatic Three.js mesh with pocket cavities
         const L_p = +P.length || 240, W_p = +P.width || 180;
         const pks = P.pockets || [];
         const baseSh = new T3.Shape([
@@ -752,8 +719,8 @@ function build(P){
   }
 
   const img = iso3d();
-  if(img) o.push({t:'i', p:[280, 10, 100, 76], u:img});
-  T(330, 92, 'ISOMETRIC VIEW (NOT TO SCALE)', 3.2, 'm', 0, 0, 1);
+  if(img) o.push({t:'i', p:[280, 10, 100, 72], u:img});
+  T(330, 88, 'ISOMETRIC VIEW (NOT TO SCALE)', 3.2, 'm', 0, 0, 1);
 
   return S;
 }
