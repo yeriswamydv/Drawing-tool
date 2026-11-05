@@ -19,7 +19,7 @@ button.o{background:none;color:var(--ac);border:1px solid var(--ac)}
 </style></head><body>
 <h1>Drawing Sheet Generator</h1>
 <p class="s">Paste design data in any format, use a Claude chat to turn it into drawing parameters (free, no API key), preview the A3 sheet, then download the PDF. Output is preliminary and must be checked by an engineer before use. Example data below is dummy.</p>
-<div class="c" style="margin-bottom:12px"><b>Free, no API key</b><div class="s" style="margin:4px 0 0">Paste design data in any wording and click <b>Read data</b>: the built-in reader picks out the part number, material, OD, bore, thickness, pockets and hole groups, and tells you what it found and what is missing. For messy text, use “Copy prompt for Claude”, send it in a Claude chat, and paste the reply into Parameters.</div></div></div>
+<div class="c" style="margin-bottom:12px"><b>Free, no API key</b><div class="s" style="margin:4px 0 0">Paste design data in any wording and click <b>Read data</b>: the built-in reader picks out the part number, material, OD, bore, thickness, pockets, lifting lugs, and hole groups, and tells you what it found and what is missing. For messy text, use “Copy prompt for Claude”, send it in a Claude chat, and paste the reply into Parameters.</div></div>
 <div class="g">
 <div class="c">
 <label for="spec">Design data (free text)</label>
@@ -41,11 +41,12 @@ holes:[{tag:"A",qty:24,dia:8,pcd:410,start:0,desc:"\u00d88.0 THRU|EXAMPLE INTERF
 notes:["ALL DIMENSIONS IN MILLIMETRES. DO NOT SCALE DRAWING.","MATERIAL: AL 6061-T6.","UNTOLERANCED DIMENSIONS PER ISO 2768-m.","POCKETS MACHINED FROM TOP FACE: 12X, 18 DP, 6 FLOOR, R6 CORNERS, RIBS 14 WIDE.","BREAK ALL SHARP EDGES 0.5 \u00d7 45\u00b0. DEBURR AND CLEAN.","MASS REDUCTION {MR}% VS SOLID \u00d8600 \u00d7 24 BLANK."],
 prelim:["Example data only. Not a real part.","Values marked (TBC) are assumed.","Verify all data before use."],
 drawn:"v0",date:new Date().toISOString().slice(0,10),tbc:["bore","pockets","holes"]};
-const PROMPT=`Convert the part spec below into ONLY a JSON object (no prose, no code fences). All units mm. Schema: {"title","subtitle","partNumber","rev","material","density"(g/cm3),"od","thk","bore"(0 if none),"pockets":{"n","depth","floor","rib","corner","rin"(pocket inner radius),"rout"}|null,"holes":[{"tag"(A,B,..),"qty","dia","pcd","start"(deg),"angles"(optional array),"depth"(blind drill depth; omit if through),"thread"(text),"cbore":{"dia","depth"}|null,"boss"(boss dia),"desc"(1-2 lines separated by |)}],"notes":[short UPPERCASE strings],"tolOD","tolT"(tolerance text like ±0.20),"prelim"(3 short lines: from spec / assumed / confirm),"drawn","date"(YYYY-MM-DD),"tbc":[names among "bore","pockets","holes" whose values you ASSUMED because the spec did not give them]}. The part is a circular ring or disc. Assume sensible values for anything missing and list them in tbc. Rev "P1 (PRELIM)" if any assumption was made. Spec:\n`;
+const PROMPT=`Convert the part spec below into ONLY a JSON object (no prose, no code fences). All units mm. Schema: {"title","subtitle","partNumber","rev","material","density"(g/cm3),"od","thk","bore"(0 if none),"pockets":{"n","depth","floor","rib","corner","rin"(pocket inner radius),"rout"}|null,"lugs":{"qty","angles":[],"reachRadius","lugNoseRadius","pinCenterRadius","pinHoleDia","tangentBlendRadius"}|null,"holes":[{"tag"(A,B,..),"qty","dia","pcd","start"(deg),"angles"(optional array),"depth"(blind drill depth; omit if through),"thread"(text),"cbore":{"dia","depth"}|null,"boss"(boss dia),"desc"(1-2 lines separated by |)}],"notes":[short UPPERCASE strings],"tolOD","tolT"(tolerance text like ±0.20),"prelim"(3 short lines: from spec / assumed / confirm),"drawn","date"(YYYY-MM-DD),"tbc":[names among "bore","pockets","holes","lugs" whose values you ASSUMED because the spec did not give them]}. The part is a circular ring or disc. Assume sensible values for anything missing and list them in tbc. Rev "P1 (PRELIM)" if any assumption was made. Spec:\n`;
 const STD=[1,.5,.4,.2,.1,.05,.02,.01],pick=r=>STD.find(s=>s<=r)||.01,sc=s=>s>=1?'1:1':'1:'+(1/s);
 const R2=v=>Math.round(v*100)/100;
 function build(P){
-let o=[];const S=[o],od=+P.od,thk=+P.thk,bore=+P.bore||0,pk=P.pockets||null,H=P.holes||[],tbc=P.tbc||[],tb=n=>tbc.includes(n)?' (TBC)':'';
+let o=[];const S=[o],od=+P.od,thk=+P.thk,bore=+P.bore||0,pk=(P.pockets&&+P.pockets.n>0)?P.pockets:null,H=P.holes||[],tbc=P.tbc||[],tb=n=>tbc.includes(n)?' (TBC)':'';
+const lugs=P.lugs||(P.liftingLugsGeometry?{qty:P.liftingLugsGeometry.length,angles:P.liftingLugsGeometry.map(l=>l.angle_deg),reachRadius:415,lugNoseRadius:25,pinCenterRadius:390,pinHoleDia:25}:null);
 if(!(od>0&&thk>0))throw new Error('od and thk are required');
 const L=(a,b,c,d,w=.3,s=0,col)=>o.push({t:'p',p:[[a,b],[c,d]],w,s,c:col});
 const PL=(p,w=.3,s=0,z=1,f,col)=>o.push({t:'p',p,w,s,z,f,c:col});
@@ -64,42 +65,85 @@ const frame=()=>{Rc(10,10,400,277,.7);Rc(5,5,410,287,.2);
 for(let i=1;i<=8;i++){T(10+(i-.5)*50,8.6,i,2.8);T(10+(i-.5)*50,291.6,i,2.8);if(i<8){L(10+i*50,5,10+i*50,10,.2);L(10+i*50,287,10+i*50,292,.2)}}
 'ABCD'.split('').forEach((c,j)=>{const y=10+(j+.5)*69.25+1;T(7.5,y,c,2.8);T(412.5,y,c,2.8);if(j<3){L(5,10+(j+1)*69.25,10,10+(j+1)*69.25,.2);L(410,10+(j+1)*69.25,415,10+(j+1)*69.25,.2)}})};frame();
 const gAng=h=>{const an=h.angles;return an?an.reduce((m,v)=>Math.abs(v-90)<Math.abs(m-90)?v:m,an[0]):(+h.start||0)};
-const rin=pk?(+pk.rin||bore/2+30):0,rout=pk?(+pk.rout||od/2-18):0,pi=pk?360/pk.n:0,hw=r=>pi/2-Math.asin(pk.rib/2/r)*180/Math.PI;
+const rin=pk?(+pk.rin||bore/2+30):0,rout=pk?(+pk.rout||od/2-18):0,pi=pk?360/pk.n:0,hw=r=>pi/2-Math.asin((+pk.rib||14)/2/r)*180/Math.PI;
 const walk=(p,i,d,r)=>{let j=i,rem=r;for(;;){const k=(j+d+p.length)%p.length,sg=Math.hypot(p[k][0]-p[j][0],p[k][1]-p[j][1]);if(sg>=rem){const u=rem/sg;return[p[j][0]+(p[k][0]-p[j][0])*u,p[j][1]+(p[k][1]-p[j][1])*u]}rem-=sg;j=k}};
 function pocketPoly(i){const a=i*pi,p=polar(rout,a-hw(rout),a+hw(rout),12).concat(polar(rin,a+hw(rin),a-hw(rin),12)),cs=[0,12,13,25],out=[],rr=+pk.corner||8;
 p.forEach((q,k)=>{if(!cs.includes(k)){out.push(q);return}const A=walk(p,k,-1,rr),B=walk(p,k,1,rr);for(let t=0;t<=6;t++){const u=t/6,v=1-u;out.push([v*v*A[0]+2*v*u*q[0]+u*u*B[0],v*v*A[1]+2*v*u*q[1]+u*u*B[1]])}});return out}
+function lugContour2D(la){const cr=+lugs.pinCenterRadius||(od/2),nr=+lugs.lugNoseRadius||25,an=la*Math.PI/180,cos=Math.cos(an),sin=Math.sin(an);
+const cx=cr*cos,cy=cr*sin,p1=[cx-sin*nr,cy+cos*nr],p2=[cx+sin*nr,cy-cos*nr];
+const arcPts=polar(nr,la+90,la-90,24).map(([x,y])=>[cx+x,cy+y]);
+const fl1=[[cx-sin*nr-cos*1.2,cy+cos*nr-sin*1.2],p1],fl2=[p2,[cx+sin*nr-cos*1.2,cy-cos*nr-sin*1.2]];
+return{cx,cy,fl1,fl2,arcPts,tip:[cx+cos*nr,cy+sin*nr]}}
 function iso3d(){try{const T=window.THREE;if(!T)return null;
 const cv=document.createElement('canvas');cv.width=900;cv.height=700;
 const rd=new T.WebGLRenderer({canvas:cv,antialias:true,preserveDrawingBuffer:true});rd.setClearColor(0xffffff);rd.setSize(900,700,false);
 const sc=new T.Scene(),pts=a=>a.map(([x,y])=>new T.Vector2(x,y)),circ=(r,x=0,y=0)=>pts(polar(r,0,360,64).map(([a,b])=>[a+x,b+y]));
 const hp=H.flatMap(h=>{const q=+h.qty||1,an=h.angles||Array.from({length:q},(_,i)=>(+h.start||0)+i*360/q);return an.map(g=>({h,g,x:h.pcd/2*Math.cos(g*Math.PI/180),y:h.pcd/2*Math.sin(g*Math.PI/180)}))});
-const pi=pk?360/pk.n:0,hw=r=>pi/2-Math.asin(pk.rib/2/r)*180/Math.PI,inP=(r,g)=>{if(!pk||r<=rin||r>=rout)return false;return Math.abs(((g+pi/2)%pi+pi)%pi-pi/2)<hw(r)};
+const pi=pk?360/pk.n:0,hw=r=>pi/2-Math.asin((+pk.rib||14)/2/r)*180/Math.PI,inP=(r,g)=>{if(!pk||r<=rin||r>=rout)return false;return Math.abs(((g+pi/2)%pi+pi)%pi-pi/2)<hw(r)};
 const add=(shape,z0,dz)=>{const g=new T.ExtrudeGeometry(shape,{depth:dz,bevelEnabled:false,curveSegments:24});g.translate(0,0,z0);sc.add(new T.Mesh(g,new T.MeshLambertMaterial({color:0xbfc5cd})));sc.add(new T.LineSegments(new T.EdgesGeometry(g,35),new T.LineBasicMaterial({color:0x222222})))};
 const fl=pk?(+pk.floor||thk-pk.depth):thk,base=new T.Shape(circ(od/2));if(bore)base.holes.push(new T.Path(circ(bore/2)));
+if(lugs){const lAngles=lugs.angles||[0,120,240],lR=+lugs.pinCenterRadius||(od/2),lNr=+lugs.lugNoseRadius||25;
+lAngles.forEach(la=>{const sh=new T.Shape(circ(lNr,lR*Math.cos(la*Math.PI/180),lR*Math.sin(la*Math.PI/180)));
+sh.holes.push(new T.Path(circ((+lugs.pinHoleDia||25)/2,lR*Math.cos(la*Math.PI/180),lR*Math.sin(la*Math.PI/180))));
+add(sh,0,thk)})}
 hp.forEach(p=>base.holes.push(new T.Path(circ(p.h.dia/2,p.x,p.y))));add(base,0,fl);
 if(pk){const tp=new T.Shape(circ(od/2));if(bore)tp.holes.push(new T.Path(circ(bore/2)));
 for(let i=0;i<+pk.n;i++)tp.holes.push(new T.Path(pts(pocketPoly(i))));
 hp.forEach(p=>{if(!inP(Math.hypot(p.x,p.y),p.g))tp.holes.push(new T.Path(circ(p.h.dia/2,p.x,p.y)))});add(tp,fl,thk-fl);
 hp.forEach(p=>{if(p.h.boss){const b=new T.Shape(circ(p.h.boss/2,p.x,p.y));b.holes.push(new T.Path(circ(p.h.dia/2,p.x,p.y)));add(b,fl,thk-fl)}})}
-const w=od*.55,cam=new T.OrthographicCamera(-w,w,w*700/900,-w*700/900,1,9000);cam.up.set(0,0,1);cam.position.set(1,-1,.8).multiplyScalar(od*2);cam.lookAt(0,0,thk/2);
+const maxDim=Math.max(od,lugs?(+lugs.reachRadius||od/2+25)*2:od),w=maxDim*.55,cam=new T.OrthographicCamera(-w,w,w*700/900,-w*700/900,1,9000);cam.up.set(0,0,1);cam.position.set(1,-1,.8).multiplyScalar(maxDim*2);cam.lookAt(0,0,thk/2);
 sc.add(new T.AmbientLight(0xffffff,.65));const dl=new T.DirectionalLight(0xffffff,.8);dl.position.set(-1,-2,3);sc.add(dl);
 rd.render(sc,cam);return cv.toDataURL('image/png')}catch(e){return null}}
 const hp=H.flatMap(h=>{const q=+h.qty||1,an=h.angles||Array.from({length:q},(_,i)=>(+h.start||0)+i*360/q);return an.map(g=>({h,g,x:h.pcd/2*Math.cos(g*Math.PI/180),y:h.pcd/2*Math.sin(g*Math.PI/180)}))});
 // ---- top view
-const s=pick(150/od),cx=107,cy=118,Rr=od/2*s,tf=([x,y])=>[cx+x*s,cy-y*s],pt=(r,a)=>tf([r*Math.cos(a*Math.PI/180),r*Math.sin(a*Math.PI/180)]),cir=(r,p,n=16)=>PL(polar(r,0,360,n).map(([a,b])=>tf([a+p.x,b+p.y])),.3);
+const maxEnvelope=Math.max(od,lugs?(+lugs.reachRadius||od/2+25)*2:od);
+const s=pick(150/maxEnvelope),cx=107,cy=118,Rr=od/2*s,tf=([x,y])=>[cx+x*s,cy-y*s],pt=(r,a)=>tf([r*Math.cos(a*Math.PI/180),r*Math.sin(a*Math.PI/180)]),cir=(r,p,n=16)=>PL(polar(r,0,360,n).map(([a,b])=>tf([a+p.x,b+p.y])),.3);
 PL(polar(od/2,0,360,144).map(tf),.6);PL(polar(od/2-3,0,360,144).map(tf),.2);if(bore)PL(polar(bore/2,0,360,120).map(tf),.6);
+if(lugs){const lAngles=lugs.angles||[0,120,240];
+lAngles.forEach(la=>{const lg=lugContour2D(la);PL(lg.fl1.map(tf),.6,0,0);PL(lg.arcPts.map(tf),.6,0,0);PL(lg.fl2.map(tf),.6,0,0);
+const tipP=tf(lg.tip),cntP=tf([lg.cx,lg.cy]);
+L(cntP[0]-3,cntP[1],cntP[0]+3,cntP[1],.15,4);L(cntP[0],cntP[1]-3,cntP[0],cntP[1]+3,.15,4);
+if(la===0){const tx=cntP[0]+12,ty=cntP[1]+16;L(cntP[0],cntP[1],tx,ty,.2);arrow(cntP[0],cntP[1],-0.6,-0.8);T(tx+1,ty+1,'3X LUGS R'+(+lugs.reachRadius||415)+' NOSE R'+(+lugs.lugNoseRadius||25),2.4,'l')}})}
 if(pk)for(let i=0;i<+pk.n;i++)PL(pocketPoly(i).map(tf),.45);
 H.forEach(h=>PL(polar(h.pcd/2,0,360,120).map(tf),.15,3));
 L(cx-Rr-10,cy,cx+Rr+14,cy,.15,4);L(cx,cy-Rr-8,cx,cy+Rr+8,.15,4);
 hp.forEach(p=>{if(p.h.boss)PL(polar(p.h.boss/2,0,360,36).map(([a,b])=>tf([a+p.x,b+p.y])),.45,0,1,'#ffffff')});
 hp.forEach(p=>{cir(p.h.dia/2,p);if(p.h.cbore)cir(p.h.cbore.dia/2,p)});
+// TOP VIEW DIMENSION CALLOUTS: OD, BORE, PCDs, POCKET RADII
 const yd=cy-Rr-12;L(cx-Rr,cy,cx-Rr,yd-2,.15);L(cx+Rr,cy,cx+Rr,yd-2,.15);L(cx-Rr,yd,cx+Rr,yd,.25);arrow(cx-Rr,yd,1,0);arrow(cx+Rr,yd,-1,0);T(cx,yd-1.5,'\u00d8'+od+' '+(P.tolOD||''),3);
-if(bore){const p1=pt(bore/2,140),p2=pt(bore/2,-40);L(p1[0],p1[1],p2[0],p2[1],.25);arrow(p1[0],p1[1],.766,.643);arrow(p2[0],p2[1],-.766,-.643);T(cx,cy+3,'\u00d8'+bore+' BORE'+tb('bore'),2.8,'m',-40)}
+if(bore){const p1=pt(bore/2,140),p2=pt(bore/2,-40);L(p1[0],p1[1],p2[0],p2[1],.25);arrow(p1[0],p1[1],.766,.643);arrow(p2[0],p2[1],-.766,-.643);T(cx+2,cy-4,'\u00d8'+bore+' BORE'+tb('bore'),2.8,'m',-40)}
+H.forEach((h,i)=>{if(!h.pcd)return;const aDim=150-i*28,leadP=pt(h.pcd/2,aDim),outP=pt(h.pcd/2+14+i*4,aDim),txP=[outP[0]-6,outP[1]-(i?2:0)];
+L(leadP[0],leadP[1],outP[0],outP[1],.2);arrow(leadP[0],leadP[1],Math.cos(aDim*Math.PI/180),-Math.sin(aDim*Math.PI/180));
+L(outP[0],outP[1],outP[0]-16,outP[1],.2);T(outP[0]-18,outP[1]+1,'\u00d8'+h.pcd+' PCD ('+h.tag+')',2.5,'r')});
+if(pk){const pIn=pt(rin,215),pOut=pt(rout,235),pRib1=pt((rin+rout)/2,90),pRib2=pt((rin+rout)/2,90);
+L(pIn[0],pIn[1],pIn[0]-15,pIn[1]+8,.2);arrow(pIn[0],pIn[1],.88,.47);T(pIn[0]-17,pIn[1]+9,'Rin '+rin,2.4,'r');
+L(pOut[0],pOut[1],pOut[0]-15,pOut[1]+8,.2);arrow(pOut[0],pOut[1],.88,.47);T(pOut[0]-17,pOut[1]+9,'Rout '+rout,2.4,'r');
+const p=pt((rin+rout)/2,120);T(14,38,pk.n+'X POCKET '+pk.depth+' DP'+tb('pockets'),2.6,'l');T(14,42,'R'+(pk.corner||8)+' CORNERS, '+R2(pk.floor||thk-pk.depth)+' FLOOR, RIB '+pk.rib,2.6,'l');L(14,43.5,62,43.5,.2);L(62,43.5,p[0],p[1],.2);PL(polar(.6,0,360,6).map(([a,b])=>[p[0]+a,p[1]+b]),.3,0,1,'#111111')}
 PL(Array.from({length:9},(_,i)=>{const a=i*15/8*Math.PI/180;return[cx+(Rr+16)*Math.cos(a),cy-(Rr+16)*Math.sin(a)]}),.2,0,0);T(cx+Rr+20,cy-6,'15\u00b0',2.8,'l');T(cx+Rr+12,cy-1.5,'0\u00b0',2.8,'l');
-if(pk){const p=pt((rin+rout)/2,120);T(14,38,pk.n+'X POCKET '+pk.depth+' DP'+tb('pockets'),2.6,'l');T(14,42,'R'+(pk.corner||8)+' CORNERS, '+R2(pk.floor||thk-pk.depth)+' FLOOR',2.6,'l');L(14,43.5,62,43.5,.2);L(62,43.5,p[0],p[1],.2);PL(polar(.6,0,360,6).map(([a,b])=>[p[0]+a,p[1]+b]),.3,0,1,'#111111')}
-const bg=H.find(h=>h.boss)||H[H.length-1],cuts=[['C',90,1]];if(bg)cuts.push(['D',gAng(bg),-1]);
+// Determine critical cutting planes:
+// Cut A: Transverse cut (90° through vertical rib, dowel pins B, and center bore)
+// Cut B: Longitudinal cut (0° through pocket floor depth, cavity, or 0° lifting lug)
+let cutA_ang = 90;
+if(H.some(h=>h.tag==='B'||h.boss)) {
+  const critH = H.find(h=>h.tag==='B')||H.find(h=>h.boss);
+  cutA_ang = gAng(critH);
+}
+let cutB_ang = 0;
+if(pk) {
+  // Pass directly through pocket center (0° is pocket center for even pocket counts)
+  cutB_ang = 0;
+} else if(lugs) {
+  cutB_ang = 0; // Passes straight through Lug 1 pin hole at 0°
+} else if(H.length>0 && gAng(H[0])!==cutA_ang) {
+  cutB_ang = gAng(H[0]); // Passes through primary mounting hole group A
+}
+
+let cuts = [
+  ['A', cutA_ang, 1],
+  ['B', cutB_ang, -1]
+];
 cuts.forEach(([n,a,sg])=>{const c=Math.cos(a*Math.PI/180),sn=Math.sin(a*Math.PI/180),dx=c,dy=-sn,nx=-dy*sg,ny=dx*sg;
-[[Rr+2,Rr+9],[bore/2*s-9,bore/2*s]].forEach(([r1,r2],k)=>{L(cx+dx*r1,cy+dy*r1,cx+dx*r2,cy+dy*r2,.9);const e=k?r1:r2,mx=cx+dx*e,my=cy+dy*e;L(mx,my,mx+nx*8,my+ny*8,.3);arrow(mx+nx*8,my+ny*8,-nx,-ny);T(mx+nx*11.5,my+ny*11.5+1.3,n,4,'m',0,0,1)})});
+[[Rr+2,Rr+9],[bore?bore/2*s-8:0,bore?bore/2*s:0]].forEach(([r1,r2],k)=>{if(r2<=0)return;L(cx+dx*r1,cy+dy*r1,cx+dx*r2,cy+dy*r2,.9);const e=k?r1:r2,mx=cx+dx*e,my=cy+dy*e;L(mx,my,mx+nx*8,my+ny*8,.3);arrow(mx+nx*8,my+ny*8,-nx,-ny);if(!k)T(mx+nx*11.5,my+ny*11.5+1.3,n,4,'m',0,0,1)})});
 H.slice(0,3).forEach((h,i)=>{const ps=hp.filter(p=>p.h===h),tg=h.angles?-15:0,nr=v=>Math.abs(((v-tg+180)%360+360)%360-180),p=ps.reduce((m,v)=>nr(v.g)<nr(m.g)?v:m,ps[0]),c=tf([p.x,p.y]),o2=[[-9,-7],[12,-6],[14,9]][i],tx=c[0]+o2[0],ty=c[1]+o2[1],l=Math.hypot(o2[0],o2[1]);
 L(c[0],c[1],tx-o2[0]/l*3,ty-o2[1]/l*3,.2);PL(polar(3,0,360,24).map(([a,b])=>[tx+a,ty-b]),.3);T(tx,ty+1.1,h.tag,3.2)});
 T(cx,202,'TOP VIEW',4.2,'m',0,0,1);T(cx,206.5,'SCALE '+sc(s),2.8);
@@ -115,25 +159,26 @@ hs.forEach(h=>{const xh=xr(h.pcd/2);L(xh,y0-4,xh,y0+thk+4,.15,4);
 const mj=/M(\d+(\.\d+)?)/.exec(h.thread||''),td=/(\d+(\.\d+)?)\s*DP/i.exec(h.thread||'');if(mj&&h.depth){const m=+mj[1],d=td?+td[1]:+h.depth-3;L(xh-m/2,y0,xh-m/2,y0+d,.2);L(xh+m/2,y0,xh+m/2,y0+d,.2)}
 if(!idx&&!h.depth)return;const ty=idx?y0-9:y0-19,tx=xh+(idx&&!h.boss&&!h.depth?-14:5),q=+h.qty||1,lb=(h.depth&&!idx?h.tag:h.tag+(h.depth?'':'  '+q+'X \u00d8'+h.dia+' THRU'));
 L(tx+(tx<xh?13:-1),ty+1.5,xh,y0,.2);arrow(xh,y0,tx<xh?-.5:.5,-.86);T(tx,ty,lb,2.6,'l');if(idx&&h.cbore)T(tx+3,ty+3.6,'C\u2019BORE \u00d8'+h.cbore.dia+' \u00d7 '+h.cbore.depth+' DP',2.6,'l')});
-if(!idx){if(inP){dim(xr(r0),y0,xr(rin),y0,-12,R2(rin-r0));dim(xr(rin),y0,xr(rout),y0,-12,R2(rout-rin)+tb('pockets'));dim(xr(rout),y0,x0+W,y0,-12,R2(od/2-rout));
+if(inP){dim(xr(r0),y0,xr(rin),y0,-12,R2(rin-r0));dim(xr(rin),y0,xr(rout),y0,-12,R2(rout-rin)+tb('pockets'));dim(xr(rout),y0,x0+W,y0,-12,R2(od/2-rout));
 const d=+pk.depth;dim(xr(rout)-6,y0,xr(rout)-6,y0+d,.01,R2(d));dim(x0+W,y0+d,x0+W,y0+thk,-9,R2(pk.floor||thk-d))}
-dim(x0,y0,x0,y0+thk,10,R2(thk)+' '+tolT)}
+dim(x0,y0,x0,y0+thk,10,R2(thk)+' '+tolT);
 T(x0,y0+thk+11,'SECTION '+nm+'-'+nm,4.2,'l',0,0,1);T(x0+45,y0+thk+11,'SCALE 1:1'+(part?' (OUTER 125 SHOWN)':'')+'   (THROUGH '+(inP?'POCKET':hs.some(h=>h.boss)?'STRUT BOSS':pk?'RIB':'SOLID WEB')+', '+a+'\u00b0)',2.6,'l')}
 cuts.forEach(([n,a],i)=>section(n,a,i?176:118,i));
 // ---- mass
 const dn=+P.density||2.81,kg=v=>v/1e6*dn,Vs=Math.PI*(od/2)**2*thk,Vb=Math.PI*(bore/2)**2*thk;
 let Vp=pk?(Math.PI*(rout**2-rin**2)-pk.n*pk.rib*(rout-rin))*pk.depth:0;H.forEach(h=>{if(h.boss&&pk)Vp-=(+h.qty||1)*Math.PI*(h.boss/2)**2/2*pk.depth});
 const Vh=H.reduce((x,h)=>x+(+h.qty||1)*(Math.PI*(h.dia/2)**2*(+h.depth||thk)+(h.cbore?Math.PI*((h.cbore.dia/2)**2-(h.dia/2)**2)*h.cbore.depth:0)),0),nh=H.reduce((x,h)=>x+(+h.qty||1),0);
-const fin=kg(Vs-Vb-Vp-Vh),red=(1-fin/kg(Vs))*100,f2=v=>v.toFixed(2);
+let Vl=0;if(lugs){const lq=+lugs.qty||3,lNr=+lugs.lugNoseRadius||25;Vl=lq*(Math.PI*lNr**2/2+lNr*25)*thk}
+const fin=kg(Vs+Vl-Vb-Vp-Vh),red=(1-fin/kg(Vs))*100,f2=v=>v.toFixed(2);
 T(160,245,'MASS PROPERTIES ('+(P.material||'').split(' (')[0].replace('AL ','')+')',2.8,'l',0,0,1);
 [['Solid blank \u00d8'+od+' \u00d7 '+thk,f2(kg(Vs))+' kg'],['Central bore','-'+f2(kg(Vb))+' kg'],['Pockets ('+(pk?pk.n:0)+'X)','-'+f2(kg(Vp))+' kg'],['Holes ('+nh+'X)','-'+f2(kg(Vh))+' kg'],['Finished part',f2(fin)+' kg'],['Mass reduction',red.toFixed(1)+' %']].forEach((r,i)=>{const y=248+i*5;L(160,y,225,y,.15);T(161,y+3.7,r[0],2.3,'l',0,0,i>3);T(224,y+3.7,r[1],2.3,'r',0,0,i>3)});L(160,278,225,278,.15);
 // ---- notes, hole table, prelim box
 const wrap=(t,n)=>{const w=[];let l='';t.split(' ').forEach(x=>{if((l+' '+x).length>n){w.push(l);l=x}else l=(l?l+' ':'')+x});w.push(l);return w};
-T(15,213,'NOTES:',3.2,'l',0,0,1);let ny=217.5;(P.notes||[]).forEach((t,i)=>wrap((i+1)+'. '+t.replace('{MR}',red.toFixed(1)),105).forEach(l=>{if(ny<243){T(15,ny,l,2.4,'l');ny+=3.4}}));
+T(15,213,'NOTES:',3.2,'l',0,0,1);let ny=217.5;(P.notes||[]).forEach((t,i)=>wrap((i+1)+'. '+t.replace('{MR}',red.toFixed(1)).replace(/EVALUATED FINISHED MASS:.*kg/i,'EVALUATED FINISHED MASS: '+f2(fin)+' kg'),105).forEach(l=>{if(ny<243){T(15,ny,l,2.4,'l');ny+=3.4}}));
 T(15,246,'HOLE TABLE (0\u00b0 = +X, CCW, VIEWED FROM TOP)',2.8,'l',0,0,1);
 const cx2=[15,25,35,97,111,155],ty=248,rh=9;Rc(15,ty,140,6+rh*H.length);L(15,ty+6,155,ty+6,.2);for(let c=1;c<5;c++)L(cx2[c],ty,cx2[c],ty+6+rh*H.length,.2);
 ['TAG','QTY','DESCRIPTION','PCD','ANGULAR POSITION'].forEach((t,c)=>T(cx2[c]+1.2,ty+4,t,2.2,'l',0,0,1));
-H.forEach((h,i)=>{const y=ty+6+rh*i,q=+h.qty||1,ls=(h.desc||'').split('|');if(i)L(15,y,155,y,.2);T(16.2,y+5.2,h.tag,2.4,'l',0,0,1);T(26.2,y+5.2,q,2.4,'l');ls.slice(0,2).forEach((t,j)=>T(36.2,y+3.8+j*3.3,t+(j?'':tb('holes')),2.2,'l'));T(98.2,y+5.2,h.pcd,2.4,'l');
+H.forEach((h,i)=>{const y=ty+6+rh*i,q=+h.qty||1,ls=(h.desc||'').split('|');if(i)L(15,y,155,y,.2);T(16.2,y+5.2,h.tag,2.4,'l',0,0,1);T(26.2,y+5.2,q,2.4,'l');ls.slice(0,2).forEach((t,j)=>T(36.2,y+3.8+j*3.3,t+(j?'':tb('holes')),2.2,'l'));T(98.2,y+5.2,h.pcd||'-',2.4,'l');
 (h.angles?wrap(h.angles.join('\u00b0, ')+'\u00b0',24):[(h.start||0)+'\u00b0 START, '+R2(360/q)+'\u00b0 EQ. SP.']).forEach((t,j)=>T(156-43.8,y+3.8+j*3.3,t,2.2,'l'))});
 Rc(237,220,168,18,.4,'#fdf1ea','#b5301c');T(239,224.2,'PRELIMINARY - ASSUMED GEOMETRY MARKED (TBC)',3,'l','','#b5301c',1);(P.prelim||[]).slice(0,3).forEach((t,i)=>T(239,228.4+i*3.3,t,2.3,'l',0,'#b5301c'));
 // ---- title block
